@@ -9,3 +9,4 @@ export { Discard } from "./discard/index.js";
 export type { DiscardEntry } from "./discard/index.js";
 export * from "./rule/index.js";
 export * from "./yaku/index.js";
+export * from "./score/index.js";
