@@ -225,8 +225,9 @@ export function getActionsAfterDiscard(params: {
 
   // --- ロン ---
   if (!isFuriten) {
+    // judgeWin は閉じた手牌 14 枚を前提とするため、ロン牌を追加
     const winCtx: WinContext = {
-      handTiles: handTiles as Tile[],
+      handTiles: [...handTiles, discardTile] as Tile[],
       melds,
       winTile: discardTile,
       isTsumo: false,

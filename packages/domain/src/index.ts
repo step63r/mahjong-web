@@ -13,3 +13,4 @@ export * from "./score/index.js";
 export * from "./action/index.js";
 export * from "./round/index.js";
 export * from "./game/index.js";
+export * from "./ai/index.js";

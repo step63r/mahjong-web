@@ -224,6 +224,8 @@ function handleTsumo(state: RoundState, playerIndex: number): RoundState {
     }
   }
 
+  applyRiichiDeductions(state, changes);
+
   const result: RoundResult = {
     reason: RoundEndReason.Win,
     wins: [{ winnerIndex: playerIndex, loserIndex: undefined, scoreResult }],
@@ -231,6 +233,7 @@ function handleTsumo(state: RoundState, playerIndex: number): RoundState {
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: playerIndex === state.dealerIndex,
     incrementHonba: playerIndex === state.dealerIndex,
+    riichiSticksInRound: state.riichiSticks,
   };
 
   applyScoreChanges(state, changes);
@@ -519,13 +522,17 @@ function handleKyuushuKyuuhai(state: RoundState, _playerIndex: number): RoundSta
     throw new Error("九種九牌は無効設定です");
   }
 
+  const changes: [number, number, number, number] = [0, 0, 0, 0];
+  applyRiichiDeductions(state, changes);
+
   const result: RoundResult = {
     reason: RoundEndReason.KyuushuKyuuhai,
     wins: [],
-    scoreChanges: [0, 0, 0, 0],
+    scoreChanges: changes,
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: abortRule === AbortiveDraw.DealerKeep,
     incrementHonba: true,
+    riichiSticksInRound: state.riichiSticks,
   };
 
   state.result = result;
@@ -579,6 +586,8 @@ function processRon(
     throw new Error("ロン和了が成立しません");
   }
 
+  applyRiichiDeductions(state, changes);
+
   const dealerWins = wins.some((w) => w.winnerIndex === state.dealerIndex);
 
   const result: RoundResult = {
@@ -588,6 +597,7 @@ function processRon(
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: dealerWins,
     incrementHonba: dealerWins,
+    riichiSticksInRound: state.riichiSticks,
   };
 
   applyScoreChanges(state, changes);
@@ -787,6 +797,8 @@ function handleExhaustiveDraw(state: RoundState): RoundState {
     dealerKeeps = false;
   }
 
+  applyRiichiDeductions(state, changes);
+
   const result: RoundResult = {
     reason: RoundEndReason.ExhaustiveDraw,
     wins: [],
@@ -794,6 +806,7 @@ function handleExhaustiveDraw(state: RoundState): RoundState {
     tenpaiPlayers: tenpaiPlayers as unknown as readonly boolean[],
     dealerKeeps,
     incrementHonba: true,
+    riichiSticksInRound: state.riichiSticks,
   };
 
   applyScoreChanges(state, changes);
@@ -824,13 +837,17 @@ function checkSuufonsuRenda(state: RoundState, playerIndex: number, tile: Tile):
   if (state.firstTurnDiscardWinds.length === 4) {
     const allSame = state.firstTurnDiscardWinds.every((w) => w === state.firstTurnDiscardWinds[0]);
     if (allSame) {
+      const changes: [number, number, number, number] = [0, 0, 0, 0];
+      applyRiichiDeductions(state, changes);
+
       const result: RoundResult = {
         reason: RoundEndReason.SuufonsuRenda,
         wins: [],
-        scoreChanges: [0, 0, 0, 0],
+        scoreChanges: changes,
         tenpaiPlayers: [false, false, false, false],
         dealerKeeps: rule === AbortiveDraw.DealerKeep,
         incrementHonba: true,
+        riichiSticksInRound: state.riichiSticks,
       };
       state.result = result;
       state.phase = RoundPhase.Completed;
@@ -850,13 +867,17 @@ function checkSuukaikan(state: RoundState): boolean {
     const singlePlayer = state.playerKanCounts.some((c) => c >= 4);
     if (singlePlayer) return false;
 
+    const changes: [number, number, number, number] = [0, 0, 0, 0];
+    applyRiichiDeductions(state, changes);
+
     const result: RoundResult = {
       reason: RoundEndReason.Suukaikan,
       wins: [],
-      scoreChanges: [0, 0, 0, 0],
+      scoreChanges: changes,
       tenpaiPlayers: [false, false, false, false],
       dealerKeeps: rule === AbortiveDraw.DealerKeep,
       incrementHonba: true,
+      riichiSticksInRound: state.riichiSticks,
     };
     state.result = result;
     state.phase = RoundPhase.Completed;
@@ -870,13 +891,17 @@ function checkSuuchaRiichi(state: RoundState): boolean {
   if (rule === AbortiveDraw.Disabled) return false;
 
   if (state.riichiPlayerCount >= 4) {
+    const changes: [number, number, number, number] = [0, 0, 0, 0];
+    applyRiichiDeductions(state, changes);
+
     const result: RoundResult = {
       reason: RoundEndReason.SuuchaRiichi,
       wins: [],
-      scoreChanges: [0, 0, 0, 0],
+      scoreChanges: changes,
       tenpaiPlayers: [true, true, true, true],
       dealerKeeps: rule === AbortiveDraw.DealerKeep,
       incrementHonba: true,
+      riichiSticksInRound: state.riichiSticks,
     };
     state.result = result;
     state.phase = RoundPhase.Completed;
@@ -886,13 +911,17 @@ function checkSuuchaRiichi(state: RoundState): boolean {
 }
 
 function handleTripleRonDraw(state: RoundState): RoundState {
+  const changes: [number, number, number, number] = [0, 0, 0, 0];
+  applyRiichiDeductions(state, changes);
+
   const result: RoundResult = {
     reason: RoundEndReason.TripleRonDraw,
     wins: [],
-    scoreChanges: [0, 0, 0, 0],
+    scoreChanges: changes,
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: true,
     incrementHonba: true,
+    riichiSticksInRound: state.riichiSticks,
   };
   state.result = result;
   state.phase = RoundPhase.Completed;
@@ -957,6 +986,8 @@ function handleNagashiMangan(state: RoundState, winnerIndices: number[]): RoundS
     tenpaiPlayers[w] = true;
   }
 
+  applyRiichiDeductions(state, changes);
+
   const result: RoundResult = {
     reason: RoundEndReason.NagashiMangan,
     wins: [],
@@ -964,6 +995,7 @@ function handleNagashiMangan(state: RoundState, winnerIndices: number[]): RoundS
     tenpaiPlayers,
     dealerKeeps,
     incrementHonba: true,
+    riichiSticksInRound: state.riichiSticks,
   };
 
   applyScoreChanges(state, changes);
@@ -981,12 +1013,17 @@ function buildWinContext(
   isTsumo: boolean,
 ): WinContext {
   const player = state.players[playerIndex];
-  const handTiles = player.hand.getTiles().filter((t) => !isSameTile(t, winTile)) as Tile[];
+  // judgeWin (parseMentsu / parseChiitoitsu / parseKokushi) は閉じた手牌が
+  // 和了牌を含めて 14 枚であることを前提とする。
+  //  - ツモ: hand にはすでに 14 枚ある（ツモ牌込み）
+  //  - ロン: hand は 13 枚なので winTile を追加して 14 枚にする
+  const rawHandTiles = player.hand.getTiles() as Tile[];
+  const handTiles = isTsumo ? rawHandTiles : [...rawHandTiles, winTile];
 
-  // ドラ計算
+  // ドラ計算（重複なくすべてのプレイヤー牌を列挙）
   const doraIndicators = state.wall.getDoraIndicators();
   const doraTypes = doraIndicators.map((t) => getDoraFromIndicator(t.type));
-  const allTiles = [...handTiles, winTile, ...player.melds.flatMap((m) => [...m.tiles])];
+  const allTiles = [...handTiles, ...player.melds.flatMap((m) => [...m.tiles])];
 
   let doraCount = 0;
   for (const t of allTiles) {
@@ -1019,7 +1056,7 @@ function buildWinContext(
     player.melds.length === 0;
 
   return {
-    handTiles,
+    handTiles: handTiles as readonly Tile[],
     melds: player.melds,
     winTile,
     isTsumo,
@@ -1048,6 +1085,19 @@ function applyScoreChanges(
 ): void {
   for (let i = 0; i < 4; i++) {
     state.players[i].score += changes[i];
+  }
+}
+
+/**
+ * リーチ宣言の供託（−1000）を得点変動に含める。
+ * 和了時の totalWinnerGain にはすでにリーチ棒の回収分が含まれるため、
+ * 宣言者の支払い分だけを追加すればゲーム全体で得点が保存される。
+ */
+function applyRiichiDeductions(state: RoundState, changes: [number, number, number, number]): void {
+  for (let i = 0; i < 4; i++) {
+    if (state.players[i].isRiichi) {
+      changes[i] -= 1000;
+    }
   }
 }
 

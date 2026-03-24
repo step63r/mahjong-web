@@ -23,6 +23,7 @@ function makeWinResult(opts: {
   dealerKeeps: boolean;
   scoreChanges: [number, number, number, number];
   wins?: WinEntry[];
+  riichiSticksInRound?: number;
 }): RoundResult {
   return {
     reason: RoundEndReason.Win,
@@ -37,12 +38,14 @@ function makeWinResult(opts: {
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: opts.dealerKeeps,
     incrementHonba: opts.dealerKeeps,
+    riichiSticksInRound: opts.riichiSticksInRound ?? 0,
   };
 }
 
 function makeDrawResult(opts: {
   dealerKeeps: boolean;
   scoreChanges?: [number, number, number, number];
+  riichiSticksInRound?: number;
 }): RoundResult {
   return {
     reason: RoundEndReason.ExhaustiveDraw,
@@ -51,6 +54,7 @@ function makeDrawResult(opts: {
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: opts.dealerKeeps,
     incrementHonba: true,
+    riichiSticksInRound: opts.riichiSticksInRound ?? 0,
   };
 }
 
@@ -281,7 +285,7 @@ describe("processRoundResult", () => {
     startGame(game);
     game.riichiSticks = 2;
 
-    processRoundResult(game, makeDrawResult({ dealerKeeps: true }));
+    processRoundResult(game, makeDrawResult({ dealerKeeps: true, riichiSticksInRound: 2 }));
 
     expect(game.riichiSticks).toBe(2);
   });

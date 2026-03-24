@@ -93,7 +93,7 @@ export interface RoundResult {
   readonly reason: RoundEndReason;
   /** 和了情報（複数和了の場合は複数） */
   readonly wins: readonly WinEntry[];
-  /** 各プレイヤーの得点変動 */
+  /** 各プレイヤーの得点変動（リーチ供託の −1000 を含む） */
   readonly scoreChanges: readonly [number, number, number, number];
   /** テンパイしていたプレイヤー（荒牌流局時） */
   readonly tenpaiPlayers: readonly boolean[];
@@ -101,6 +101,8 @@ export interface RoundResult {
   readonly dealerKeeps: boolean;
   /** 本場が増えるかどうか */
   readonly incrementHonba: boolean;
+  /** この局終了時点でのリーチ棒数（前局からの繰り越し＋今局の新規宣言を含む） */
+  readonly riichiSticksInRound: number;
 }
 
 // ===== 局の全体状態 =====

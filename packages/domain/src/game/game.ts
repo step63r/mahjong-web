@@ -68,9 +68,13 @@ export function processRoundResult(state: GameState, roundResult: RoundResult): 
   };
   state.roundHistory.push(entry);
 
-  // 供託リーチ棒の処理（和了の場合は和了者が取るため0にリセット）
+  // 供託リーチ棒の処理
+  // 和了の場合: 全リーチ棒は和了者の totalWinnerGain に含まれているため 0 にリセット
+  // 流局の場合: 今局の新規リーチ棒を含めた全リーチ棒を次局に引き継ぎ
   if (roundResult.wins.length > 0) {
     state.riichiSticks = 0;
+  } else {
+    state.riichiSticks = roundResult.riichiSticksInRound;
   }
 
   // トビ判定
