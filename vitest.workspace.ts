@@ -6,6 +6,7 @@ export default defineWorkspace([
       name: "domain",
       root: "./packages/domain",
       include: ["src/**/*.test.ts"],
+      exclude: ["dist/**", "node_modules/**"],
     },
   },
   {
@@ -13,6 +14,7 @@ export default defineWorkspace([
       name: "shared",
       root: "./packages/shared",
       include: ["src/**/*.test.ts"],
+      exclude: ["dist/**", "node_modules/**"],
     },
   },
   {
@@ -20,6 +22,7 @@ export default defineWorkspace([
       name: "server",
       root: "./packages/server",
       include: ["src/**/*.test.ts"],
+      exclude: ["dist/**", "node_modules/**"],
     },
   },
   {
@@ -27,6 +30,7 @@ export default defineWorkspace([
       name: "client",
       root: "./packages/client",
       include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      exclude: ["dist/**", "node_modules/**"],
     },
   },
 ]);
