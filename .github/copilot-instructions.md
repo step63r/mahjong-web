@@ -214,11 +214,34 @@ mahjong-web/
     │   └── src/
     │       └── index.ts
     │
-    ├── client/                    # フロントエンド — React SPA（未実装）
+    ├── client/                    # フロントエンド — React SPA（CPU対局UI実装済み）
     │   ├── package.json
     │   ├── tsconfig.json
     │   └── src/
-    │       └── index.ts
+    │       ├── index.ts
+    │       ├── stores/
+    │       │   └── gameStore.ts       # Zustand ゲームストア（CPU対局ループ）
+    │       ├── utils/
+    │       │   └── viewConverter.ts   # domain → UI 表示データ変換
+    │       ├── types.ts               # UI 用の型定義
+    │       ├── pages/
+    │       │   ├── HomePage.tsx        # トップページ
+    │       │   └── GamePage.tsx        # 対局画面
+    │       └── components/
+    │           ├── tile/
+    │           │   ├── TileView.tsx    # 牌コンポーネント（rotation prop で回転対応）
+    │           │   ├── TileFace.tsx    # 牌の表面 SVG
+    │           │   └── TileBack.tsx    # 牌の裏面 SVG
+    │           ├── board/
+    │           │   ├── GameBoard.tsx   # メイン盤面レイアウト（3×3 CSS Grid 捨て牌 + InfoPanel）
+    │           │   ├── PlayerHand.tsx  # 手牌表示（ツモ牌領域常時確保）
+    │           │   ├── DiscardArea.tsx # 捨て牌エリア（flow + tileRotation で4方向対応）
+    │           │   ├── MeldDisplay.tsx # 副露表示（鳴き元に応じた横倒し位置）
+    │           │   ├── InfoPanel.tsx   # 中央情報パネル（局・ドラ・得点）
+    │           │   └── DebugPanel.tsx  # デバッグパネル
+    │           └── overlay/
+    │               ├── RoundResultOverlay.tsx  # 局結果画面（役名日本語表示・ドラ数表示）
+    │               └── GameResultOverlay.tsx   # 最終結果画面
     │
     └── server/                    # バックエンド — API / WebSocket サーバー（未実装）
         ├── package.json
@@ -264,6 +287,33 @@ hand, action, round, rule, tile ← ai
 | index     | 1       |
 
 ## アーキテクチャ指針
+
+### client パッケージの実装メモ
+
+以下は client パッケージ実装時に特筆すべき設計判断・注意点である。
+
+#### 捨て牌の表示（DiscardArea）
+- 4方向の捨て牌は CSS `transform: rotate()` ではなく **flexbox の方向制御**（`flow` prop: right/left/up/down）で配置する。CSS rotation は親のレイアウトボックスに影響しないため `overflow: hidden` によるクリッピングが効かない。
+- 各プレイヤーの牌の向き（牌面の回転）は `tileRotation` prop（0/90/180/270）で TileView に渡す。自家=0°, 下家=270°, 対面=180°, 上家=90°。
+- リーチ宣言牌の横倒しは `tileRotation` の逆方向（`(360 - tileRotation) % 360`）を使い、どの方向でも正しい向きに横になる。
+
+#### TileView の回転
+- `rotation` prop で牌を回転させる際、width/height のスワップではなく **margin 補正方式**を使用する。90°/270° 回転時はマイナスマージンで配置を補正 (`margin: ${-diff}px ${diff}px`)。これにより SVG のアスペクト比が崩れず、牌のサイズが均一になる。
+
+#### 副露の表示（MeldDisplay）
+- 鳴き元の相対位置（上家/対面/下家）に基づいて横倒し牌の位置を変える。viewConverter の `toMeldView` で `fromPlayerIndex` から相対位置を算出し、牌の並び順を再構成する。
+  - 上家（relative=3）: 横倒し牌を左端
+  - 対面（relative=2）: 横倒し牌を真ん中（明槓は右から2番目）
+  - 下家（relative=1）: 横倒し牌を右端
+
+#### 盤面レイアウト（GameBoard）
+- 中央エリアは **3×3 CSS Grid**（gridTemplateColumns/Rows: `100px 1fr 100px`）で構成。各捨て牌セルに `overflow-hidden` を設定し、牌がはみ出してもクリップされる。
+- 自家の手牌行は `手牌 + ツモ牌領域 + 副露` を同一行に flex 配置。ツモ牌領域は常に確保し、手牌の左右位置がツモの有無で変わらないようにする。
+- アクションボタン（ポン・チー・リーチ等）は手牌の上部に右寄せで配置する。
+
+#### 局結果画面（RoundResultOverlay）
+- 役名は domain の `Yaku` 定数を日本語名に変換する `YAKU_NAMES` マッピングで表示する。
+- ドラ数は `judgeResult.totalHan` から `yakuList` の飜数合計を引いて算出し、1以上の場合に「ドラN」を末尾に付与する（ドラは yakuList には含まれず totalHan にのみ加算される仕様）。
 
 ### コンポーネント設計
 
