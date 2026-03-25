@@ -10,6 +10,7 @@ interface InfoPanelProps {
   doraIndicators: readonly TileData[];
   scores: readonly number[];
   currentPlayer: number;
+  dealerIndex?: number;
   seatLabels?: readonly string[];
 }
 
@@ -29,6 +30,7 @@ export function InfoPanel({
   doraIndicators,
   scores,
   currentPlayer,
+  dealerIndex,
   seatLabels = ["自家", "下家", "対面", "上家"],
 }: InfoPanelProps) {
   const windLabel = WIND_LABELS[roundWind] ?? roundWind;
@@ -66,7 +68,10 @@ export function InfoPanel({
               i === currentPlayer ? "text-yellow-300 font-bold" : "text-gray-300"
             }`}
           >
-            <span>{seatLabels[i]}</span>
+            <span>
+              {seatLabels[i]}
+              {dealerIndex === i && "(親)"}
+            </span>
             <span>{score.toLocaleString()}点</span>
           </div>
         ))}

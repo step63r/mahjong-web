@@ -1,130 +1,166 @@
-import { useState } from "react";
+import { useEffect, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { GameBoard } from "@/components/board/GameBoard";
 import { ActionButtons } from "@/components/action/ActionButtons";
-import type { TileData, PlayerViewState } from "@/types";
-
-// --- Mock data helpers ---
-
-function t(type: string, id: number, isRedDora = false): TileData {
-  return { type, id, isRedDora };
-}
-
-function createMockState(): {
-  players: PlayerViewState[];
-  doraIndicators: TileData[];
-} {
-  const selfHand: TileData[] = [
-    t("man1", 0),
-    t("man2", 0),
-    t("man3", 0),
-    t("pin4", 0),
-    t("pin5", 0, true),
-    t("pin6", 0),
-    t("sou7", 0),
-    t("sou8", 0),
-    t("sou9", 0),
-    t("ton", 0),
-    t("ton", 1),
-    t("haku", 0),
-    t("haku", 1),
-  ];
-
-  const faceDownHand = (count: number): TileData[] =>
-    Array.from({ length: count }, (_, i) => t("haku", i));
-
-  return {
-    players: [
-      {
-        hand: selfHand,
-        drawnTile: t("hatsu", 0),
-        discards: [
-          { tile: t("pei", 0) },
-          { tile: t("sha", 0) },
-          { tile: t("chun", 0) },
-          { tile: t("man9", 0) },
-          { tile: t("pin1", 0) },
-          { tile: t("sou1", 0) },
-        ],
-        melds: [],
-        score: 25000,
-      },
-      {
-        hand: faceDownHand(13),
-        discards: [
-          { tile: t("pei", 1) },
-          { tile: t("man8", 0) },
-          { tile: t("sou2", 0) },
-          { tile: t("pin9", 0) },
-          { tile: t("sha", 1) },
-        ],
-        melds: [],
-        score: 25000,
-      },
-      {
-        hand: faceDownHand(13),
-        discards: [
-          { tile: t("nan", 0) },
-          { tile: t("man7", 0) },
-          { tile: t("sou3", 0) },
-          { tile: t("pin8", 0) },
-        ],
-        melds: [
-          {
-            tiles: [t("chun", 1), t("chun", 2), t("chun", 3)],
-            calledTileIndex: 2,
-          },
-        ],
-        score: 25000,
-      },
-      {
-        hand: faceDownHand(13),
-        discards: [
-          { tile: t("pei", 2) },
-          { tile: t("man6", 0) },
-          { tile: t("sou4", 0), isRiichi: true },
-        ],
-        melds: [],
-        score: 24000,
-      },
-    ],
-    doraIndicators: [t("man4", 0)],
-  };
-}
-
-const MOCK_ACTIONS = [
-  { type: "riichi", label: "リーチ" },
-  { type: "skip", label: "スキップ" },
-];
-
-// --- Component ---
+import { RoundResultOverlay } from "@/components/overlay/RoundResultOverlay";
+import { DebugPanel } from "@/components/debug/DebugPanel";
+import { useGameStore } from "@/stores/gameStore";
+import { buildPlayerViews, buildActionOptions } from "@/utils/viewConverter";
+import { ActionType } from "@mahjong-web/domain";
+import type { TileData } from "@/types";
 
 export function GamePage() {
-  const [selectedTileIndex, setSelectedTileIndex] = useState<number | undefined>();
-  const { players, doraIndicators } = createMockState();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const gameLength = (location.state as { gameLength?: string } | null)?.gameLength ?? "hanchan";
 
-  const handleTileClick = (index: number) => {
-    setSelectedTileIndex((prev) => (prev === index ? undefined : index));
-  };
+  const {
+    uiPhase,
+    gameState,
+    roundState,
+    availableActions,
+    selectedTileIndex,
+    debugMode,
+    startCpuGame,
+    selectTile,
+    performAction,
+    nextRound,
+    toggleDebugMode,
+  } = useGameStore();
 
-  const handleAction = (type: string) => {
-    if (type === "skip") {
-      setSelectedTileIndex(undefined);
+  // ゲーム開始
+  useEffect(() => {
+    if (uiPhase === "idle") {
+      startCpuGame(gameLength as "tonpu" | "hanchan");
     }
-  };
+  }, [uiPhase, gameLength, startCpuGame]);
+
+  // ゲーム終了 → リザルト画面へ遷移
+  useEffect(() => {
+    if (uiPhase === "gameResult") {
+      navigate("/result");
+    }
+  }, [uiPhase, navigate]);
+
+  const handleTileClick = useCallback(
+    (index: number) => {
+      if (uiPhase !== "waitingHumanDraw") return;
+
+      if (selectedTileIndex === index) {
+        // ダブルクリックで打牌
+        const discardActions = availableActions.filter((a) => a.type === ActionType.Discard);
+        // ソート済みUI手牌からindex番目の牌のtypeを取得して打牌
+        const views = buildPlayerViews(roundState!, 0, debugMode);
+        const selfView = views[0];
+        const sortedTile =
+          index === selfView.hand.length ? selfView.drawnTile : selfView.hand[index];
+        if (sortedTile) {
+          const match = discardActions.find(
+            (a) => a.type === ActionType.Discard && a.tile.type === sortedTile.type,
+          );
+          if (match) {
+            performAction(match);
+            return;
+          }
+        }
+        selectTile(undefined);
+      } else {
+        selectTile(index);
+      }
+    },
+    [
+      uiPhase,
+      selectedTileIndex,
+      availableActions,
+      roundState,
+      debugMode,
+      performAction,
+      selectTile,
+    ],
+  );
+
+  const handleAction = useCallback(
+    (type: string) => {
+      if (type === ActionType.Skip) {
+        performAction({ type: ActionType.Skip, playerIndex: 0 });
+        return;
+      }
+      const match = availableActions.find((a) => a.type === type);
+      if (match) {
+        performAction(match);
+      }
+    },
+    [availableActions, performAction],
+  );
+
+  // ロード中
+  if (!roundState || !gameState) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-emerald-900">
+        <p className="text-white text-xl">読み込み中...</p>
+      </div>
+    );
+  }
+
+  const playerViews = buildPlayerViews(roundState, 0, debugMode);
+  const actionOptions = buildActionOptions(availableActions);
+  const doraIndicators: TileData[] = roundState.wall.getDoraIndicators().map((t) => ({
+    type: t.type,
+    id: t.id,
+    isRedDora: t.isRedDora,
+  }));
+
+  const isWaiting = uiPhase === "waitingHumanDraw" || uiPhase === "waitingHumanAfterDiscard";
 
   return (
-    <GameBoard
-      players={players}
-      roundWind="ton"
-      roundNumber={1}
-      honba={0}
-      riichiSticks={1}
-      remainingTiles={56}
-      doraIndicators={doraIndicators}
-      currentPlayer={0}
-      selectedTileIndex={selectedTileIndex}
-      onTileClick={handleTileClick}
-      actionButtons={<ActionButtons actions={MOCK_ACTIONS} onAction={handleAction} />}
-    />
+    <>
+      <GameBoard
+        players={playerViews}
+        roundWind={gameState.currentRound.roundWind}
+        roundNumber={gameState.currentRound.roundNumber}
+        honba={gameState.honba}
+        riichiSticks={roundState.riichiSticks}
+        remainingTiles={roundState.wall.remainingDrawCount}
+        doraIndicators={doraIndicators}
+        currentPlayer={roundState.activePlayerIndex}
+        dealerIndex={roundState.dealerIndex}
+        selectedTileIndex={isWaiting ? selectedTileIndex : undefined}
+        onTileClick={isWaiting ? handleTileClick : undefined}
+        actionButtons={
+          isWaiting ? <ActionButtons actions={actionOptions} onAction={handleAction} /> : undefined
+        }
+      />
+
+      {/* デバッグモード切替（開発環境のみ） */}
+      {import.meta.env.DEV && (
+        <button
+          onClick={toggleDebugMode}
+          className={`fixed top-2 right-2 text-xs px-2 py-1 rounded z-50 ${
+            debugMode ? "bg-red-600 text-white" : "bg-gray-700/50 text-gray-300"
+          }`}
+        >
+          {debugMode ? "DEBUG ON" : "DEBUG"}
+        </button>
+      )}
+
+      {/* デバッグパネル */}
+      {debugMode && roundState && <DebugPanel round={roundState} />}
+
+      {/* CPU思考中表示 */}
+      {uiPhase === "cpuThinking" && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-lg text-sm z-40">
+          CPUが思考中...
+        </div>
+      )}
+
+      {/* 局結果オーバーレイ */}
+      {uiPhase === "roundResult" && roundState.result && (
+        <RoundResultOverlay
+          result={roundState.result}
+          scores={gameState.scores}
+          onNext={nextRound}
+        />
+      )}
+    </>
   );
 }

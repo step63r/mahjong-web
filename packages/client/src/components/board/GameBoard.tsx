@@ -13,6 +13,7 @@ interface GameBoardProps {
   remainingTiles: number;
   doraIndicators: readonly TileData[];
   currentPlayer: number;
+  dealerIndex?: number;
   selectedTileIndex?: number;
   onTileClick?: (index: number) => void;
   actionButtons?: React.ReactNode;
@@ -27,6 +28,7 @@ export function GameBoard({
   remainingTiles,
   doraIndicators,
   currentPlayer,
+  dealerIndex,
   selectedTileIndex,
   onTileClick,
   actionButtons,
@@ -44,27 +46,33 @@ export function GameBoard({
         <PlayerHand tiles={toimen?.hand ?? []} tileSize={22} faceDown />
       </div>
 
-      {/* Middle row: Side opponents + Center discards */}
-      <div className="flex flex-1 min-h-0 items-center">
-        {/* Kamicha (left) */}
-        <div className="hidden md:flex flex-col items-center justify-center p-1 gap-1 w-24 shrink-0">
-          <span className="text-xs text-emerald-300/60">上家</span>
-          <span className="text-xs text-white">{(kamicha?.score ?? 0).toLocaleString()}</span>
-        </div>
+      {/* Middle: Center area with discards around info panel (3×3 grid) */}
+      <div className="flex flex-1 min-h-0 items-center justify-center">
 
-        {/* Center: Discard rivers + info */}
-        <div className="flex-1 flex items-center justify-center gap-3 p-2 min-w-0">
-          <div className="bg-emerald-800/50 rounded-lg p-3">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <DiscardArea discards={kamicha?.discards ?? []} tileSize={22} label="上家" />
-              <DiscardArea discards={toimen?.discards ?? []} tileSize={22} label="対面" />
-              <DiscardArea discards={self?.discards ?? []} tileSize={22} label="自家" />
-              <DiscardArea discards={shimocha?.discards ?? []} tileSize={22} label="下家" />
-            </div>
+        {/* 3×3 grid: discard rivers surround InfoPanel */}
+        <div
+          className="grid shrink-0"
+          style={{
+            gridTemplateColumns: "100px 1fr 100px",
+            gridTemplateRows: "100px 1fr 100px",
+            width: 440,
+            height: 440,
+          }}
+        >
+          {/* row 1 */}
+          <div /> {/* top-left corner */}
+          <div className="overflow-hidden flex items-end justify-end">
+            {/* 対面: 右→左、行は下→上（最初の行が下=中央寄り） */}
+            <DiscardArea discards={toimen?.discards ?? []} tileSize={20} flow="left" tileRotation={180} />
           </div>
+          <div /> {/* top-right corner */}
 
-          {/* Info panel */}
-          <div className="hidden sm:block">
+          {/* row 2 */}
+          <div className="overflow-hidden flex items-start justify-end">
+            {/* 上家: 上→下、列は右→左（最初の列が右=中央寄り） */}
+            <DiscardArea discards={kamicha?.discards ?? []} tileSize={20} flow="down" tileRotation={90} />
+          </div>
+          <div className="flex items-center justify-center">
             <InfoPanel
               roundWind={roundWind}
               roundNumber={roundNumber}
@@ -74,28 +82,40 @@ export function GameBoard({
               doraIndicators={doraIndicators}
               scores={players.map((p) => p.score)}
               currentPlayer={currentPlayer}
+              dealerIndex={dealerIndex}
             />
           </div>
+          <div className="overflow-hidden flex items-end justify-start">
+            {/* 下家: 下→上、列は左→右（最初の列が左=中央寄り） */}
+            <DiscardArea discards={shimocha?.discards ?? []} tileSize={20} flow="up" tileRotation={270} />
+          </div>
+
+          {/* row 3 */}
+          <div /> {/* bottom-left corner */}
+          <div className="overflow-hidden flex items-start justify-start">
+            {/* 自家: 左→右、行は上→下（最初の行が上=中央寄り） */}
+            <DiscardArea discards={self?.discards ?? []} tileSize={20} flow="right" />
+          </div>
+          <div /> {/* bottom-right corner */}
         </div>
 
-        {/* Shimocha (right) */}
-        <div className="hidden md:flex flex-col items-center justify-center p-1 gap-1 w-24 shrink-0">
-          <span className="text-xs text-emerald-300/60">下家</span>
-          <span className="text-xs text-white">{(shimocha?.score ?? 0).toLocaleString()}</span>
-        </div>
       </div>
 
       {/* Bottom: Self melds + hand + actions */}
       <div className="flex flex-col items-center gap-2 p-2 pb-4">
-        <MeldDisplay melds={self?.melds ?? []} tileSize={30} />
-        <PlayerHand
-          tiles={self?.hand ?? []}
-          drawnTile={self?.drawnTile}
-          tileSize={40}
-          selectedIndex={selectedTileIndex}
-          onTileClick={onTileClick}
-        />
-        {actionButtons}
+        <div className="flex flex-col items-end gap-2">
+          {actionButtons}
+          <div className="flex items-end gap-5">
+            <PlayerHand
+              tiles={self?.hand ?? []}
+              drawnTile={self?.drawnTile}
+              tileSize={40}
+              selectedIndex={selectedTileIndex}
+              onTileClick={onTileClick}
+            />
+            <MeldDisplay melds={self?.melds ?? []} tileSize={30} />
+          </div>
+        </div>
       </div>
     </div>
   );

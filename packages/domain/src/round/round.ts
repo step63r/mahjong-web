@@ -306,12 +306,10 @@ function handleDiscard(
     return state;
   }
 
-  // 一発の権利を消す（自分以外）
-  for (let i = 0; i < 4; i++) {
-    if (i !== playerIndex && state.players[i].isIppatsu) {
-      // 他家の鳴きで一発が消える処理は鳴きハンドラで行うが、
-      // ここでは巡目が進んだプレイヤーの一発を消す
-    }
+  // 一発の権利を消す
+  // リーチ宣言打牌ではなく通常の打牌を行った場合、自分の一発を消す
+  if (!isRiichiDeclare && player.isIppatsu) {
+    player.isIppatsu = false;
   }
 
   // isFirstTurn: 鳴きが入らず自分の最初の打牌が完了

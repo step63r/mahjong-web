@@ -6,7 +6,6 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "outDir": "./dist",
-    "rootDir": "./src",
     "composite": false,
     "declaration": false,
     "declarationMap": false,

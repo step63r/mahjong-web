@@ -9,6 +9,8 @@ interface TileViewProps {
   selected?: boolean;
   faceDown?: boolean;
   rotated?: boolean;
+  /** プレイヤー方向に応じた回転角度 (0, 90, 180, 270) */
+  rotation?: number;
 }
 
 export function TileView({
@@ -18,16 +20,25 @@ export function TileView({
   selected = false,
   faceDown = false,
   rotated = false,
+  rotation = 0,
 }: TileViewProps) {
   const width = size;
   const height = size * 1.4;
 
+  const effectiveRotation = (rotation + (rotated ? 90 : 0)) % 360;
+  const isSwapped = effectiveRotation === 90 || effectiveRotation === 270;
+  const diff = (height - width) / 2;
+
   const style: React.CSSProperties = {
-    width: rotated ? height : width,
-    height: rotated ? width : height,
-    transform: [selected ? "translateY(-8px)" : "", rotated ? "rotate(90deg)" : ""]
+    width,
+    height,
+    transform: [
+      selected ? "translateY(-8px)" : "",
+      effectiveRotation ? `rotate(${effectiveRotation}deg)` : "",
+    ]
       .filter(Boolean)
       .join(" "),
+    ...(isSwapped && { margin: `${-diff}px ${diff}px` }),
     transition: "transform 0.1s ease",
     cursor: onClick ? "pointer" : "default",
   };

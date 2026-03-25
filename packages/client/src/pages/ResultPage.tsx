@@ -1,15 +1,39 @@
 import { useNavigate } from "react-router-dom";
+import { useGameStore } from "@/stores/gameStore";
+
+const PLAYER_NAMES = ["あなた", "CPU 1", "CPU 2", "CPU 3"] as const;
 
 export function ResultPage() {
   const navigate = useNavigate();
+  const { gameResult, returnToTop } = useGameStore();
 
-  // Mock results
-  const results = [
-    { rank: 1, label: "CPU 3", score: 42000, diff: "+52.0" },
-    { rank: 2, label: "あなた", score: 28000, diff: "+8.0" },
-    { rank: 3, label: "CPU 1", score: 18000, diff: "-12.0" },
-    { rank: 4, label: "CPU 2", score: 12000, diff: "-48.0" },
-  ];
+  const handleReturn = () => {
+    returnToTop();
+    navigate("/");
+  };
+
+  if (!gameResult) {
+    return (
+      <div className="min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
+        <p className="text-white text-xl">結果データがありません</p>
+        <button
+          onClick={handleReturn}
+          className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-xl text-lg transition-colors"
+        >
+          トップに戻る
+        </button>
+      </div>
+    );
+  }
+
+  // 順位順にソート
+  const rows = PLAYER_NAMES.map((name, i) => ({
+    name,
+    rank: gameResult.rankings[i],
+    score: gameResult.finalScores[i],
+    points: gameResult.finalPoints[i],
+    isHuman: i === 0,
+  })).sort((a, b) => a.rank - b.rank);
 
   return (
     <div className="min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
@@ -26,15 +50,18 @@ export function ResultPage() {
             </tr>
           </thead>
           <tbody>
-            {results.map((r) => (
+            {rows.map((r) => (
               <tr
                 key={r.rank}
-                className={r.label === "あなた" ? "text-yellow-300 font-bold" : "text-gray-200"}
+                className={r.isHuman ? "text-yellow-300 font-bold" : "text-gray-200"}
               >
                 <td className="py-3 text-2xl">{r.rank}位</td>
-                <td className="py-3">{r.label}</td>
+                <td className="py-3">{r.name}</td>
                 <td className="py-3 text-right">{r.score.toLocaleString()}点</td>
-                <td className="py-3 text-right">{r.diff}</td>
+                <td className="py-3 text-right">
+                  {r.points > 0 ? "+" : ""}
+                  {r.points.toFixed(1)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -42,7 +69,7 @@ export function ResultPage() {
       </div>
 
       <button
-        onClick={() => navigate("/")}
+        onClick={handleReturn}
         className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-xl text-lg transition-colors"
       >
         トップに戻る

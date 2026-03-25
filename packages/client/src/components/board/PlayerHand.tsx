@@ -18,6 +18,8 @@ export function PlayerHand({
   tileSize = 40,
   faceDown = false,
 }: PlayerHandProps) {
+  const drawnTileWidth = tileSize + tileSize * 0.25;
+
   return (
     <div className="flex items-end gap-0.5 flex-wrap justify-center">
       {tiles.map((tile, i) => (
@@ -30,18 +32,21 @@ export function PlayerHand({
           faceDown={faceDown}
         />
       ))}
-      {drawnTile && (
-        <>
-          <div style={{ width: tileSize * 0.25 }} />
-          <TileView
-            tile={drawnTile}
-            size={tileSize}
-            selected={selectedIndex === tiles.length}
-            onClick={onTileClick ? () => onTileClick(tiles.length) : undefined}
-            faceDown={faceDown}
-          />
-        </>
-      )}
+      {/* ツモ牌領域（常に確保） */}
+      <div style={{ width: drawnTileWidth }} className="flex items-end">
+        {drawnTile && (
+          <>
+            <div style={{ width: tileSize * 0.25 }} className="shrink-0" />
+            <TileView
+              tile={drawnTile}
+              size={tileSize}
+              selected={selectedIndex === tiles.length}
+              onClick={onTileClick ? () => onTileClick(tiles.length) : undefined}
+              faceDown={faceDown}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }

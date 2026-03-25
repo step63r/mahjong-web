@@ -10,11 +10,16 @@ export interface TileData {
 export interface DiscardEntryData {
   readonly tile: TileData;
   readonly isRiichi?: boolean;
+  /** リーチ宣言牌が鳴かれた場合、代わりにこの牌を横向きにする */
+  readonly isRiichiRotated?: boolean;
 }
 
 export interface MeldViewData {
   readonly tiles: readonly TileData[];
+  /** 横倒しにする牌のインデックス（鳴き元に基づく位置） */
   readonly calledTileIndex?: number;
+  /** 副露の種類 */
+  readonly meldType: string;
 }
 
 export interface PlayerViewState {
