@@ -53,24 +53,24 @@ export function GameBoard({
         <div
           className="grid shrink-0"
           style={{
-            gridTemplateColumns: "100px 1fr 100px",
-            gridTemplateRows: "100px 1fr 100px",
-            width: 440,
-            height: 440,
+            gridTemplateColumns: "130px 1fr 130px",
+            gridTemplateRows: "130px 1fr 130px",
+            width: 560,
+            height: 560,
           }}
         >
           {/* row 1 */}
           <div /> {/* top-left corner */}
           <div className="overflow-hidden flex items-end justify-end">
             {/* 対面: 右→左、行は下→上（最初の行が下=中央寄り） */}
-            <DiscardArea discards={toimen?.discards ?? []} tileSize={20} flow="left" tileRotation={180} />
+            <DiscardArea discards={toimen?.discards ?? []} tileSize={28} flow="left" tileRotation={180} />
           </div>
           <div /> {/* top-right corner */}
 
           {/* row 2 */}
           <div className="overflow-hidden flex items-start justify-end">
             {/* 上家: 上→下、列は右→左（最初の列が右=中央寄り） */}
-            <DiscardArea discards={kamicha?.discards ?? []} tileSize={20} flow="down" tileRotation={90} />
+            <DiscardArea discards={kamicha?.discards ?? []} tileSize={28} flow="down" tileRotation={90} />
           </div>
           <div className="flex items-center justify-center">
             <InfoPanel
@@ -87,14 +87,14 @@ export function GameBoard({
           </div>
           <div className="overflow-hidden flex items-end justify-start">
             {/* 下家: 下→上、列は左→右（最初の列が左=中央寄り） */}
-            <DiscardArea discards={shimocha?.discards ?? []} tileSize={20} flow="up" tileRotation={270} />
+            <DiscardArea discards={shimocha?.discards ?? []} tileSize={28} flow="up" tileRotation={270} />
           </div>
 
           {/* row 3 */}
           <div /> {/* bottom-left corner */}
           <div className="overflow-hidden flex items-start justify-start">
             {/* 自家: 左→右、行は上→下（最初の行が上=中央寄り） */}
-            <DiscardArea discards={self?.discards ?? []} tileSize={20} flow="right" />
+            <DiscardArea discards={self?.discards ?? []} tileSize={28} flow="right" />
           </div>
           <div /> {/* bottom-right corner */}
         </div>

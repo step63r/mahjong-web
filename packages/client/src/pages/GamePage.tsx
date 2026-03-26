@@ -21,11 +21,18 @@ export function GamePage() {
     availableActions,
     selectedTileIndex,
     debugMode,
+    debugSelectedWallTileKey,
+    debugSelectedHandTileKey,
+    debugTargetPlayer,
     startCpuGame,
     selectTile,
     performAction,
     nextRound,
     toggleDebugMode,
+    selectDebugWallTile,
+    selectDebugHandTile,
+    setDebugTargetPlayer,
+    performDebugSwap,
   } = useGameStore();
 
   // ゲーム開始
@@ -110,7 +117,7 @@ export function GamePage() {
     isRedDora: t.isRedDora,
   }));
 
-  const isWaiting = uiPhase === "waitingHumanDraw" || uiPhase === "waitingHumanAfterDiscard";
+  const isWaiting = !debugMode && (uiPhase === "waitingHumanDraw" || uiPhase === "waitingHumanAfterDiscard");
 
   return (
     <>
@@ -144,7 +151,18 @@ export function GamePage() {
       )}
 
       {/* デバッグパネル */}
-      {debugMode && roundState && <DebugPanel round={roundState} />}
+      {debugMode && roundState && (
+        <DebugPanel
+          round={roundState}
+          targetPlayer={debugTargetPlayer}
+          selectedWallTileKey={debugSelectedWallTileKey}
+          selectedHandTileKey={debugSelectedHandTileKey}
+          onSelectWallTile={selectDebugWallTile}
+          onSelectHandTile={selectDebugHandTile}
+          onSetTargetPlayer={setDebugTargetPlayer}
+          onSwap={performDebugSwap}
+        />
+      )}
 
       {/* CPU思考中表示 */}
       {uiPhase === "cpuThinking" && (

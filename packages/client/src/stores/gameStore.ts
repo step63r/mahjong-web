@@ -54,6 +54,9 @@ export interface GameStore {
   selectedTileIndex: number | undefined;
   cpuDelay: number;
   debugMode: boolean;
+  debugSelectedWallTileKey: string | undefined;
+  debugSelectedHandTileKey: string | undefined;
+  debugTargetPlayer: number;
 
   // actions
   startCpuGame: (gameLength: "tonpu" | "hanchan") => void;
@@ -62,6 +65,10 @@ export interface GameStore {
   nextRound: () => void;
   returnToTop: () => void;
   toggleDebugMode: () => void;
+  selectDebugWallTile: (key: string | undefined) => void;
+  selectDebugHandTile: (key: string | undefined) => void;
+  setDebugTargetPlayer: (playerIndex: number) => void;
+  performDebugSwap: () => void;
 }
 
 const AI = new BasicAiPlayer();
@@ -137,8 +144,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedTileIndex: undefined,
   cpuDelay: 300,
   debugMode: false,
+  debugSelectedWallTileKey: undefined,
+  debugSelectedHandTileKey: undefined,
+  debugTargetPlayer: 0,
 
   startCpuGame: (gameLength) => {
+    // Strict Mode の二重実行によるゲームループ重複を防止
+    if (get().uiPhase !== "idle") return;
+
     const ruleConfig: RuleConfig =
       gameLength === "tonpu" ? createTonpuDefaults() : createDefaultRuleConfig();
 
@@ -246,7 +259,67 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   toggleDebugMode: () => {
-    set((s) => ({ debugMode: !s.debugMode }));
+    set((s) => ({
+      debugMode: !s.debugMode,
+      debugSelectedWallTileKey: undefined,
+      debugSelectedHandTileKey: undefined,
+      debugTargetPlayer: 0,
+    }));
+  },
+
+  selectDebugWallTile: (key) => {
+    set({ debugSelectedWallTileKey: key });
+  },
+
+  selectDebugHandTile: (key) => {
+    set({ debugSelectedHandTileKey: key });
+  },
+
+  setDebugTargetPlayer: (playerIndex) => {
+    set({ debugTargetPlayer: playerIndex, debugSelectedHandTileKey: undefined });
+  },
+
+  performDebugSwap: () => {
+    const { roundState, debugSelectedWallTileKey, debugSelectedHandTileKey, debugTargetPlayer } =
+      get();
+    if (
+      !roundState ||
+      debugSelectedWallTileKey === undefined ||
+      debugSelectedHandTileKey === undefined
+    )
+      return;
+
+    const tileKey = (t: Tile) => `${t.type}:${t.id}`;
+    const player = roundState.players[debugTargetPlayer];
+    const handTile = [...player.hand.getTiles()].find((t) => tileKey(t) === debugSelectedHandTileKey);
+    if (!handTile) return;
+
+    // 牌山の残り牌からキーで検索し、絶対インデックスを算出
+    const remainingTiles = roundState.wall.getRemainingTiles();
+    const wallRelativeIndex = remainingTiles.findIndex((t) => tileKey(t) === debugSelectedWallTileKey);
+    if (wallRelativeIndex === -1) return;
+    const absoluteIndex = roundState.wall.getDrawIndex() + wallRelativeIndex;
+
+    // 牌山の牌を手牌の牌と交換
+    const wallTile = roundState.wall.swapTileAt(absoluteIndex, handTile);
+
+    // 手牌から元の牌を除去して、牌山から取り出した牌を追加
+    player.hand.removeTile(handTile);
+    player.hand.addTile(wallTile);
+
+    // 人間の手牌を入れ替えた場合、availableActions を再計算
+    const { uiPhase, humanPlayerIndex } = get();
+    const newAvailableActions =
+      uiPhase === "waitingHumanDraw" && debugTargetPlayer === humanPlayerIndex
+        ? getHumanDrawActions(roundState, humanPlayerIndex)
+        : get().availableActions;
+
+    set({
+      roundState: { ...roundState } as unknown as RoundState,
+      debugSelectedWallTileKey: undefined,
+      debugSelectedHandTileKey: undefined,
+      availableActions: newAvailableActions,
+    });
   },
 }));
 
@@ -282,6 +355,8 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
     setTimeout(() => {
       const state = get().roundState;
       if (!state || state.phase !== RoundPhase.DrawPhase) return;
+      // 人間の番をCPUとして処理しないガード
+      if (state.activePlayerIndex === get().humanPlayerIndex) return;
 
       const pIdx = state.activePlayerIndex;
       const player = state.players[pIdx];

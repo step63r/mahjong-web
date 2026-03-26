@@ -1,51 +1,122 @@
 import type { RoundState } from "@mahjong-web/domain";
+import { sortTiles } from "@mahjong-web/domain";
+import { TileView } from "@/components/tile/TileView";
+import type { TileData } from "@/types";
 
 interface DebugPanelProps {
   round: RoundState;
+  targetPlayer: number;
+  selectedWallTileKey: string | undefined;
+  selectedHandTileKey: string | undefined;
+  onSelectWallTile: (key: string | undefined) => void;
+  onSelectHandTile: (key: string | undefined) => void;
+  onSetTargetPlayer: (playerIndex: number) => void;
+  onSwap: () => void;
 }
 
 const SEAT_NAMES = ["自家", "下家", "対面", "上家"] as const;
 
-export function DebugPanel({ round }: DebugPanelProps) {
+function tileKey(t: { type: string; id: number }): string {
+  return `${t.type}:${t.id}`;
+}
+
+export function DebugPanel({
+  round,
+  targetPlayer,
+  selectedWallTileKey,
+  selectedHandTileKey,
+  onSelectWallTile,
+  onSelectHandTile,
+  onSetTargetPlayer,
+  onSwap,
+}: DebugPanelProps) {
+  const handTiles = sortTiles([...round.players[targetPlayer].hand.getTiles()]);
+  const remainingTiles = sortTiles([...round.wall.getRemainingTiles()]);
+
+  const canSwap = selectedWallTileKey !== undefined && selectedHandTileKey !== undefined;
+
   return (
-    <div className="fixed top-10 right-2 bg-gray-900/90 text-white text-xs rounded-lg p-3 max-w-xs max-h-[80vh] overflow-y-auto z-50 space-y-2">
-      <div className="text-red-400 font-bold mb-1">DEBUG MODE</div>
+    <div className="fixed top-10 right-2 bg-gray-900/95 text-white text-xs rounded-lg p-3 w-80 max-h-[90vh] overflow-y-auto z-50 space-y-3">
+      <div className="text-red-400 font-bold text-sm">DEBUG MODE</div>
 
-      <div className="text-gray-400">
-        Phase: {round.phase} | Turn: {round.turnCount} | Active:{" "}
-        {SEAT_NAMES[round.activePlayerIndex]}
-      </div>
-
-      <div className="text-gray-400">
-        残り: {round.wall.remainingDrawCount}枚 | 本場: {round.honba} | リーチ棒:{" "}
-        {round.riichiSticks}
-      </div>
-
-      {/* 各プレイヤーの手牌 */}
-      {round.players.map((player, i) => {
-        const tiles = player.hand.getTiles();
-        return (
-          <div key={i} className="border-t border-gray-700 pt-1">
-            <div className="text-amber-400">
-              {SEAT_NAMES[i]}
-              {player.isRiichi ? " [リーチ]" : ""}
-              {player.isDoubleRiichi ? " [ダブリー]" : ""}
-            </div>
-            <div className="text-green-300 break-all">{tiles.map((t) => t.type).join(" ")}</div>
-          </div>
-        );
-      })}
-
-      {/* ドラ表示牌 */}
-      <div className="border-t border-gray-700 pt-1">
-        <div className="text-amber-400">ドラ表示牌</div>
-        <div className="text-green-300">
-          {round.wall
-            .getDoraIndicators()
-            .map((t) => t.type)
-            .join(" ")}
+      {/* 対象プレイヤー選択 */}
+      <div>
+        <div className="text-gray-400 mb-1">対象プレイヤー:</div>
+        <div className="flex gap-1">
+          {SEAT_NAMES.map((name, i) => (
+            <button
+              key={i}
+              onClick={() => onSetTargetPlayer(i)}
+              className={`px-2 py-0.5 rounded text-xs ${
+                targetPlayer === i
+                  ? "bg-amber-500 text-black font-bold"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+            >
+              {name}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* 手牌 */}
+      <div>
+        <div className="text-amber-400 mb-1">
+          {SEAT_NAMES[targetPlayer]}の手牌（{handTiles.length}枚）
+        </div>
+        <div className="flex flex-wrap gap-0.5">
+          {handTiles.map((t, i) => {
+            const td: TileData = { type: t.type, id: t.id, isRedDora: t.isRedDora };
+            return (
+              <TileView
+                key={tileKey(t)}
+                tile={td}
+                size={24}
+                selected={selectedHandTileKey === tileKey(t)}
+                onClick={() => {
+                  const k = tileKey(t);
+                  onSelectHandTile(selectedHandTileKey === k ? undefined : k);
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 牌山残り */}
+      <div>
+        <div className="text-amber-400 mb-1">牌山残り（{remainingTiles.length}枚）</div>
+        <div className="flex flex-wrap gap-0.5">
+          {remainingTiles.map((t, i) => {
+            const td: TileData = { type: t.type, id: t.id, isRedDora: t.isRedDora };
+            return (
+              <TileView
+                key={tileKey(t)}
+                tile={td}
+                size={20}
+                selected={selectedWallTileKey === tileKey(t)}
+                onClick={() => {
+                  const k = tileKey(t);
+                  onSelectWallTile(selectedWallTileKey === k ? undefined : k);
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 交換ボタン */}
+      <button
+        onClick={onSwap}
+        disabled={!canSwap}
+        className={`w-full py-1.5 rounded text-sm font-bold ${
+          canSwap
+            ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer"
+            : "bg-gray-700 text-gray-500 cursor-not-allowed"
+        }`}
+      >
+        交換する
+      </button>
     </div>
   );
 }

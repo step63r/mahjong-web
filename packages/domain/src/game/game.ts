@@ -19,7 +19,9 @@ function getMaxWindIndex(gameLength: GameLength): number {
 /**
  * 新しい対局を作成する
  */
-export function createGame(ruleConfig: RuleConfig): GameState {
+export function createGame(ruleConfig: RuleConfig, initialDealerIndex?: number): GameState {
+  // 起家: 指定がなければランダムに決定（0〜3）
+  const dealerIndex = initialDealerIndex ?? Math.floor(Math.random() * 4);
   return {
     phase: GamePhase.NotStarted,
     ruleConfig,
@@ -30,7 +32,7 @@ export function createGame(ruleConfig: RuleConfig): GameState {
       ruleConfig.startingPoints,
     ],
     currentRound: { roundWind: TT.Ton, roundNumber: 1 },
-    dealerIndex: 0,
+    dealerIndex,
     honba: 0,
     riichiSticks: 0,
     roundHistory: [],

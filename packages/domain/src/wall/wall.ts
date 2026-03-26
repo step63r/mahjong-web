@@ -176,6 +176,37 @@ export class Wall {
   getAllTiles(): readonly Tile[] {
     return this.tiles;
   }
+
+  /**
+   * まだツモされていない残りの牌を返す（デバッグ用）
+   * drawIndex から王牌開始位置までの牌を返す。
+   */
+  getRemainingTiles(): readonly Tile[] {
+    return this.tiles.slice(this.drawIndex, Wall.DEAD_WALL_START);
+  }
+
+  /**
+   * 牌山内の指定位置の牌を差し替える（デバッグ用）
+   *
+   * @param absoluteIndex 牌山配列内の絶対インデックス
+   * @param newTile 差し替える新しい牌
+   * @returns 元の牌
+   */
+  swapTileAt(absoluteIndex: number, newTile: Tile): Tile {
+    if (absoluteIndex < this.drawIndex || absoluteIndex >= Wall.DEAD_WALL_START) {
+      throw new Error("指定位置の牌は交換できません");
+    }
+    const old = this.tiles[absoluteIndex];
+    this.tiles[absoluteIndex] = newTile;
+    return old;
+  }
+
+  /**
+   * 現在の drawIndex を返す（デバッグ用）
+   */
+  getDrawIndex(): number {
+    return this.drawIndex;
+  }
 }
 
 /**

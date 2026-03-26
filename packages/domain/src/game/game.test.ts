@@ -63,7 +63,7 @@ function makeDrawResult(opts: {
 describe("createGame", () => {
   it("デフォルト半荘ルールでゲームを作成できる", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     expect(game.phase).toBe(GamePhase.NotStarted);
     expect(game.scores).toEqual([25000, 25000, 25000, 25000]);
     expect(game.currentRound).toEqual({ roundWind: TT.Ton, roundNumber: 1 });
@@ -75,7 +75,7 @@ describe("createGame", () => {
 
   it("東風ルールでも作成できる", () => {
     const rule = createTonpuDefaults();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     expect(game.phase).toBe(GamePhase.NotStarted);
     expect(game.ruleConfig.gameLength).toBe(GameLength.Tonpu);
   });
@@ -86,7 +86,7 @@ describe("createGame", () => {
 describe("startGame", () => {
   it("InProgress に遷移する", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
     expect(game.phase).toBe(GamePhase.InProgress);
   });
@@ -97,7 +97,7 @@ describe("startGame", () => {
 describe("processRoundResult", () => {
   it("得点変動が正しく反映される", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     const result = makeWinResult({
@@ -111,7 +111,7 @@ describe("processRoundResult", () => {
 
   it("履歴が追加される", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     const result = makeWinResult({
@@ -126,7 +126,7 @@ describe("processRoundResult", () => {
 
   it("親流れ: 東1局→東2局に進む", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     const result = makeWinResult({
@@ -141,7 +141,7 @@ describe("processRoundResult", () => {
 
   it("連荘: 東1局で親和了→東1局1本場", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     const result = makeWinResult({
@@ -157,7 +157,7 @@ describe("processRoundResult", () => {
 
   it("東4局で親流れ → 南1局に進む（半荘）", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     // 東1~3局を親流れで進める
@@ -177,7 +177,7 @@ describe("processRoundResult", () => {
 
   it("南4局で親流れ → ゲーム終了（半荘）", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     // 東1~4 + 南1~3 で親流れ（計7局）
@@ -196,7 +196,7 @@ describe("processRoundResult", () => {
 
   it("東風戦: 東4局で親流れ → 終了", () => {
     const rule = createTonpuDefaults();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     for (let i = 0; i < 3; i++) {
@@ -212,7 +212,7 @@ describe("processRoundResult", () => {
 
   it("トビ: 持ち点が負→ゲーム終了（BelowZero）", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     // プレイヤー1が大量失点
@@ -229,7 +229,7 @@ describe("processRoundResult", () => {
 
   it("トビ無効の場合は負の持ち点でも続行", () => {
     const rule = { ...createDefaultRuleConfig(), tobi: TobiRule.Disabled };
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     const result = makeWinResult({
@@ -244,7 +244,7 @@ describe("processRoundResult", () => {
 
   it("荒牌流局で本場が増える", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     // 荒牌流局、親テンパイで連荘
@@ -255,7 +255,7 @@ describe("processRoundResult", () => {
 
   it("荒牌流局、親ノーテンで親流れ+本場増加", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
 
     processRoundResult(game, makeDrawResult({ dealerKeeps: false }));
@@ -266,7 +266,7 @@ describe("processRoundResult", () => {
 
   it("和了で供託リーチ棒がリセットされる", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
     game.riichiSticks = 3; // 3本供託
 
@@ -281,7 +281,7 @@ describe("processRoundResult", () => {
 
   it("流局で供託リーチ棒は残る", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     startGame(game);
     game.riichiSticks = 2;
 
@@ -292,7 +292,7 @@ describe("processRoundResult", () => {
 
   it("NotStarted フェーズではエラー", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
 
     expect(() => {
       processRoundResult(game, makeDrawResult({ dealerKeeps: true }));
@@ -305,7 +305,7 @@ describe("processRoundResult", () => {
 describe("calculateFinalResult", () => {
   it("全員25000点なら順位は席順通り", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     game.phase = GamePhase.Finished;
 
     const result = calculateFinalResult(game);
@@ -314,7 +314,7 @@ describe("calculateFinalResult", () => {
 
   it("得点が高い順に順位がつく", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     game.scores = [10000, 40000, 30000, 20000];
     game.phase = GamePhase.Finished;
 
@@ -324,7 +324,7 @@ describe("calculateFinalResult", () => {
 
   it("供託リーチ棒が残っている場合トップに加算", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     game.scores = [30000, 25000, 25000, 20000];
     game.riichiSticks = 2;
     game.phase = GamePhase.Finished;
@@ -338,7 +338,7 @@ describe("calculateFinalResult", () => {
     // デフォルト: uma=10-30, return=30000, start=25000
     // oka = (30000-25000)*4/1000 = 20
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     game.scores = [40000, 30000, 20000, 10000];
     game.phase = GamePhase.Finished;
 
@@ -356,7 +356,7 @@ describe("calculateFinalResult", () => {
 
   it("同点の場合は席順が前のプレイヤーが上位", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
     game.scores = [25000, 25000, 30000, 20000];
     game.phase = GamePhase.Finished;
 
@@ -371,7 +371,7 @@ describe("calculateFinalResult", () => {
 describe("getCurrentRoundInfo", () => {
   it("初期状態の局情報を取得できる", () => {
     const rule = createDefaultRuleConfig();
-    const game = createGame(rule);
+    const game = createGame(rule, 0);
 
     const info = getCurrentRoundInfo(game);
     expect(info.roundWind).toBe(TT.Ton);
