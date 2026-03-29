@@ -11,11 +11,14 @@ export interface UserDto {
 export interface RoomPlayerDto {
   seatIndex: number;
   playerName: string;
+  isConnected: boolean;
+  userId: string | null;
 }
 
 /** ルーム情報 */
 export interface RoomDto {
   roomId: string;
+  hostSeatIndex: number;
   gameType: "tonpu" | "hanchan";
   status: "waiting" | "playing" | "finished";
   players: RoomPlayerDto[];
@@ -47,6 +50,138 @@ export interface GameHistoryDto {
   }>;
 }
 
+// === ゲーム状態同期型 ===
+
+/** JSON互換の牌表現 */
+export interface TileDto {
+  type: string;
+  id: number;
+  isRedDora: boolean;
+}
+
+/** JSON互換の副露表現 */
+export interface MeldDto {
+  type: string;
+  tiles: TileDto[];
+  calledTile?: TileDto;
+  fromPlayerIndex?: number;
+}
+
+/** 河の1エントリ */
+export interface DiscardEntryDto {
+  tile: TileDto;
+  isTsumogiri: boolean;
+  isRiichiDeclare: boolean;
+  calledByPlayerIndex?: number;
+}
+
+/** 他家から見たプレイヤー情報（手牌非公開） */
+export interface OpponentPlayerView {
+  seatIndex: number;
+  seatWind: string;
+  handCount: number;
+  melds: MeldDto[];
+  discards: DiscardEntryDto[];
+  isRiichi: boolean;
+  isDoubleRiichi: boolean;
+  score: number;
+  playerName: string;
+}
+
+/** 自分から見たプレイヤー情報（手牌公開） */
+export interface SelfPlayerView {
+  seatIndex: number;
+  seatWind: string;
+  handTiles: TileDto[];
+  melds: MeldDto[];
+  discards: DiscardEntryDto[];
+  isRiichi: boolean;
+  isDoubleRiichi: boolean;
+  score: number;
+  playerName: string;
+}
+
+/** 和了情報DTO */
+export interface WinEntryDto {
+  winnerIndex: number;
+  loserIndex: number | undefined;
+  totalHan: number;
+  totalFu: number;
+  level: string;
+  yakuList: Array<{ name: string; han: number }>;
+  payment: {
+    totalWinnerGain: number;
+    ronLoserPayment: number;
+    tsumoPaymentDealer: number;
+    tsumoPaymentChild: number;
+  };
+}
+
+/** 局結果DTO */
+export interface RoundResultDto {
+  reason: string;
+  wins: WinEntryDto[];
+  scoreChanges: [number, number, number, number];
+  tenpaiPlayers: boolean[];
+  dealerKeeps: boolean;
+}
+
+/** プレイヤー視点のゲーム状態 */
+export interface PlayerGameView {
+  /** ゲーム情報 */
+  roomId: string;
+  gamePhase: string;
+  /** 局情報 */
+  roundWind: string;
+  roundNumber: number;
+  honba: number;
+  riichiSticks: number;
+  dealerIndex: number;
+  turnCount: number;
+  /** 現在のフェーズ */
+  roundPhase: string;
+  activePlayerIndex: number;
+  /** ドラ表示牌 */
+  doraIndicators: TileDto[];
+  /** 牌山残り枚数 */
+  remainingTiles: number;
+  /** 自分の情報 */
+  mySeatIndex: number;
+  self: SelfPlayerView;
+  /** 他家の情報 */
+  opponents: OpponentPlayerView[];
+  /** 利用可能なアクション */
+  availableActions: ActionDto[];
+  /** 局結果（completed時のみ） */
+  roundResult?: RoundResultDto;
+  /** 最終結果（finished時のみ） */
+  gameResult?: GameResultDto;
+}
+
+/** 最終結果DTO */
+export interface GameResultDto {
+  finalScores: [number, number, number, number];
+  rankings: [number, number, number, number];
+  finalPoints: [number, number, number, number];
+  playerNames: string[];
+}
+
+// === アクションDTO ===
+
+/** JSON互換のアクション表現 */
+export interface ActionDto {
+  type: string;
+  playerIndex: number;
+  tile?: TileDto;
+  tileType?: string;
+  isTsumogiri?: boolean;
+  candidate?: {
+    tiles: [TileDto, TileDto];
+    calledTile: TileDto;
+    resultTiles: [TileDto, TileDto, TileDto];
+  };
+}
+
 // === Socket.IO イベント型 ===
 
 /** クライアント → サーバー */
@@ -54,20 +189,21 @@ export interface ClientToServerEvents {
   "room:join": (data: { roomId: string; playerName: string }) => void;
   "room:leave": () => void;
   "room:startGame": () => void;
-  "game:action": (data: { roomId: string; action: unknown }) => void;
-  "game:requestSync": (data: { roomId: string }) => void;
-  "game:syncState": (data: { targetId: string; state: unknown }) => void;
+  "game:action": (data: { action: ActionDto }) => void;
+  "game:requestSync": () => void;
 }
 
 /** サーバー → クライアント */
 export interface ServerToClientEvents {
-  "room:playerJoined": (data: { playerName: string; socketId: string }) => void;
-  "room:playerLeft": (data: { playerName: string; socketId: string }) => void;
-  "room:members": (data: { count: number }) => void;
+  "room:playerJoined": (data: RoomPlayerDto) => void;
+  "room:playerLeft": (data: { seatIndex: number; playerName: string }) => void;
+  "room:state": (data: RoomDto) => void;
   "game:started": (data: { roomId: string }) => void;
-  "game:action": (data: { playerId: string; action: unknown }) => void;
-  "game:syncRequested": (data: { playerId: string }) => void;
-  "game:syncState": (data: { state: unknown }) => void;
+  "game:stateUpdate": (data: PlayerGameView) => void;
+  "game:roundResult": (data: { view: PlayerGameView; result: RoundResultDto }) => void;
+  "game:gameResult": (data: { view: PlayerGameView; result: GameResultDto }) => void;
+  "game:error": (data: { message: string }) => void;
+  "room:error": (data: { message: string }) => void;
 }
 
 // === API リクエスト型 ===
@@ -79,4 +215,8 @@ export interface LoginRequest {
 export interface CreateRoomRequest {
   gameType: "tonpu" | "hanchan";
   ruleConfig: Record<string, unknown>;
+}
+
+export interface JoinRoomRequest {
+  playerName: string;
 }

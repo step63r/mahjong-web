@@ -11,12 +11,14 @@ import { authRoutes } from "./routes/auth.js";
 import { roomRoutes } from "./routes/rooms.js";
 import { statsRoutes } from "./routes/stats.js";
 import { registerSocketHandlers } from "./ws/index.js";
+import { GameManager } from "./game/GameManager.js";
 
 import type { Server } from "socket.io";
 
 declare module "fastify" {
   interface FastifyInstance {
     io: Server;
+    gameManager: GameManager;
   }
 }
 
@@ -56,11 +58,16 @@ export async function buildApp() {
   await app.register(statsRoutes, { prefix: "/api/stats" });
 
   // --- ヘルスチェック ---
+  app.get("/", async () => ({ status: "ok", name: "mahjong-web-server" }));
   app.get("/api/health", async () => ({ status: "ok" }));
 
   // --- Socket.IO ハンドラ登録 ---
+  // GameManager は ready 後に io が利用可能になってから初期化する
   app.ready().then(() => {
-    registerSocketHandlers(app.io);
+    const gameManager = new GameManager(app.io);
+    // decorate は ready 前に行えないため、プロパティとして直接設定
+    (app as unknown as Record<string, unknown>)["gameManager"] = gameManager;
+    registerSocketHandlers(app.io, gameManager);
   });
 
   return app;

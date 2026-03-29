@@ -15,6 +15,8 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/error": "^4.2.0",
     "@fastify/sensible": "^6.0.4",
+    "@mahjong-web/domain": "*",
+    "@mahjong-web/shared": "*",
     "@prisma/adapter-better-sqlite3": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "better-sqlite3": "^12.8.0",

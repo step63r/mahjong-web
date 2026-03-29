@@ -1,29 +1,15 @@
-import type { Server, Socket } from "socket.io";
+import type { Socket } from "socket.io";
+import type { GameManager } from "../game/GameManager.js";
+import type { ActionDto } from "@mahjong-web/shared";
 
-export function registerGameHandlers(_io: Server, socket: Socket) {
+export function registerGameHandlers(socket: Socket, gameManager: GameManager) {
   // プレイヤーアクション（打牌・ツモ・鳴き等）
-  socket.on("game:action", (data: { roomId: string; action: unknown }) => {
-    // ルーム内の他プレイヤーにアクションをブロードキャスト
-    socket.to(data.roomId).emit("game:action", {
-      playerId: socket.id,
-      action: data.action,
-    });
+  socket.on("game:action", (data: { action: ActionDto }) => {
+    gameManager.handlePlayerAction(socket.id, data.action);
   });
 
-  // ゲーム状態の同期リクエスト
-  socket.on("game:requestSync", (data: { roomId: string }) => {
-    socket.to(data.roomId).emit("game:syncRequested", {
-      playerId: socket.id,
-    });
+  // ゲーム状態の同期リクエスト（再接続後などに使用）
+  socket.on("game:requestSync", () => {
+    gameManager.handleSyncRequest(socket.id);
   });
-
-  // ゲーム状態の送信（ホスト→要求者）
-  socket.on(
-    "game:syncState",
-    (data: { targetId: string; state: unknown }) => {
-      socket.to(data.targetId).emit("game:syncState", {
-        state: data.state,
-      });
-    },
-  );
 }
