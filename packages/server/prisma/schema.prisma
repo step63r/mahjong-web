@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// ユーザー（Firebase UID で紐付け）
+model User {
+  id          String       @id @default(cuid())
+  firebaseUid String       @unique @map("firebase_uid")
+  displayName String       @map("display_name")
+  photoUrl    String?      @map("photo_url")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  gamePlayers GamePlayer[]
+
+  @@map("users")
+}
+
+/// 対局（半荘 or 東風）
+model Game {
+  id          String       @id @default(cuid())
+  gameType    String       @map("game_type") // "tonpu" | "hanchan"
+  status      String       @default("waiting") // "waiting" | "playing" | "finished"
+  ruleConfig  String       @map("rule_config") // JSON文字列
+  createdAt   DateTime     @default(now()) @map("created_at")
+  finishedAt  DateTime?    @map("finished_at")
+  gamePlayers GamePlayer[]
+  rounds      Round[]
+
+  @@map("games")
+}
+
+/// 対局参加者
+model GamePlayer {
+  id          String  @id @default(cuid())
+  gameId      String  @map("game_id")
+  userId      String? @map("user_id") // ゲストの場合はnull
+  seatIndex   Int     @map("seat_index") // 0-3
+  playerName  String  @map("player_name")
+  finalScore  Int?    @map("final_score")
+  finalRank   Int?    @map("final_rank") // 1-4
+  ratingDelta Float?  @map("rating_delta")
+
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  roundStats RoundPlayerStat[]
+
+  @@unique([gameId, seatIndex])
+  @@map("game_players")
+}
+
+/// 局
+model Round {
+  id          String   @id @default(cuid())
+  gameId      String   @map("game_id")
+  roundWind   Int      @map("round_wind") // 0=東, 1=南
+  roundNumber Int      @map("round_number") // 0-3
+  honba       Int      @default(0)
+  resultType  String   @map("result_type") // "tsumo" | "ron" | "draw" | "abortive_draw"
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  game  Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  stats RoundPlayerStat[]
+
+  @@map("rounds")
+}
+
+/// 局ごとのプレイヤー成績
+model RoundPlayerStat {
+  id            String  @id @default(cuid())
+  roundId       String  @map("round_id")
+  gamePlayerId  String  @map("game_player_id")
+  isWinner      Boolean @default(false) @map("is_winner")
+  isLoser       Boolean @default(false) @map("is_loser") // 放銃者
+  scoreDelta    Int     @default(0) @map("score_delta")
+  yakuList      String? @map("yaku_list") // JSON: [{ name, han }]
+  han           Int?
+  fu            Int?
+
+  round      Round      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  gamePlayer GamePlayer @relation(fields: [gamePlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, gamePlayerId])
+  @@map("round_player_stats")
+}

@@ -1,2 +1,11 @@
-// @mahjong-web/shared
-// フロントエンド・バックエンド共有パッケージ（DTO型、定数 等）
+export type {
+  UserDto,
+  RoomPlayerDto,
+  RoomDto,
+  StatsSummaryDto,
+  GameHistoryDto,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  LoginRequest,
+  CreateRoomRequest,
+} from "./types.js";
