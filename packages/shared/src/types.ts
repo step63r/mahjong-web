@@ -186,6 +186,7 @@ export interface ActionDto {
 
 /** クライアント → サーバー */
 export interface ClientToServerEvents {
+  "room:create": (data: { playerName: string; gameType: "tonpu" | "hanchan" }) => void;
   "room:join": (data: { roomId: string; playerName: string }) => void;
   "room:leave": () => void;
   "room:startGame": () => void;

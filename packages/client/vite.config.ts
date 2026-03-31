@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "src"),
       "@mahjong-web/domain": path.resolve(__dirname, "../domain/src/index.ts"),
+      "@mahjong-web/shared": path.resolve(__dirname, "../shared/src/index.ts"),
     },
   },
 });

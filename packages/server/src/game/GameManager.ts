@@ -23,6 +23,8 @@ import {
   RoundPhase,
   GamePhase,
   ActionType,
+  createDefaultRuleConfig,
+  createTonpuDefaults,
 } from "@mahjong-web/domain";
 import type {
   RoundState,
@@ -86,6 +88,21 @@ export class GameManager {
   private userToRoom = new Map<string, string>();
 
   constructor(private io: Server) {}
+
+  /** 6桁のルームIDを生成 */
+  generateRoomId(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let id: string;
+    do {
+      id = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    } while (this.rooms.has(id));
+    return id;
+  }
+
+  /** gameType に応じたデフォルトルール設定を返す */
+  getDefaultRuleConfig(gameType: "tonpu" | "hanchan"): RuleConfig {
+    return gameType === "tonpu" ? createTonpuDefaults() : createDefaultRuleConfig();
+  }
 
   // ========== ルーム管理 ==========
 

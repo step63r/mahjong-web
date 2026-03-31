@@ -1,0 +1,188 @@
+/**
+ * サーバーから受信した PlayerGameView (DTO) を
+ * 既存 GameBoard が受け取る PlayerViewState[] に変換するユーティリティ。
+ *
+ * CPU対局用の viewConverter.ts はドメインオブジェクトを直接参照するが、
+ * こちらは JSON 互換の DTO のみを扱う。
+ */
+import type {
+  PlayerGameView,
+  SelfPlayerView,
+  OpponentPlayerView,
+  MeldDto,
+  TileDto,
+  DiscardEntryDto,
+  ActionDto,
+} from "@mahjong-web/shared";
+import type { TileData, DiscardEntryData, MeldViewData, PlayerViewState } from "@/types";
+
+// ===== 基本変換 =====
+
+function dtoToTileData(dto: TileDto): TileData {
+  return { type: dto.type, id: dto.id, isRedDora: dto.isRedDora };
+}
+
+function dtoToDiscardEntry(dto: DiscardEntryDto): DiscardEntryData {
+  return {
+    tile: dtoToTileData(dto.tile),
+    isRiichi: dto.isRiichiDeclare,
+  };
+}
+
+/**
+ * MeldDto → MeldViewData
+ * 鳴き元の相対位置に基づいて横倒し牌の位置を決める。
+ */
+function dtoToMeldView(dto: MeldDto, playerSeatIndex: number): MeldViewData {
+  const meldType = dto.type;
+
+  if (meldType === "ankan") {
+    return { tiles: dto.tiles.map(dtoToTileData), meldType };
+  }
+
+  const fromIndex = dto.fromPlayerIndex;
+  if (fromIndex === undefined || !dto.calledTile) {
+    return { tiles: dto.tiles.map(dtoToTileData), meldType };
+  }
+
+  const relative = (fromIndex - playerSeatIndex + 4) % 4;
+  const calledTileData = dtoToTileData(dto.calledTile);
+  const ownTileData = dto.tiles
+    .filter((t) => !(t.type === dto.calledTile!.type && t.id === dto.calledTile!.id))
+    .map(dtoToTileData);
+
+  let tiles: TileData[];
+  let calledTileIndex: number;
+
+  if (relative === 3) {
+    // 上家: 左端
+    tiles = [calledTileData, ...ownTileData];
+    calledTileIndex = 0;
+  } else if (relative === 2) {
+    // 対面: 真ん中
+    if (meldType === "minkan" || meldType === "kakan") {
+      tiles = [ownTileData[0], calledTileData, ownTileData[1], ownTileData[2]];
+      calledTileIndex = 1;
+    } else {
+      tiles = [ownTileData[0], calledTileData, ownTileData[1]];
+      calledTileIndex = 1;
+    }
+  } else {
+    // 下家: 右端
+    tiles = [...ownTileData, calledTileData];
+    calledTileIndex = tiles.length - 1;
+  }
+
+  return { tiles, calledTileIndex, meldType };
+}
+
+// ===== Self → PlayerViewState =====
+
+function selfToViewState(self: SelfPlayerView): PlayerViewState {
+  const tiles = self.handTiles.map(dtoToTileData);
+  const hasDraw = tiles.length % 3 === 2; // 14, 11, 8, 5, 2...
+
+  let hand: TileData[];
+  let drawnTile: TileData | undefined;
+
+  if (hasDraw) {
+    drawnTile = tiles[tiles.length - 1];
+    hand = tiles.slice(0, -1);
+  } else {
+    hand = tiles;
+    drawnTile = undefined;
+  }
+
+  return {
+    hand,
+    drawnTile,
+    discards: self.discards.map(dtoToDiscardEntry),
+    melds: self.melds.map((m) => dtoToMeldView(m, self.seatIndex)),
+    score: self.score,
+  };
+}
+
+// ===== Opponent → PlayerViewState =====
+
+function opponentToViewState(opp: OpponentPlayerView): PlayerViewState {
+  const hand: TileData[] = Array.from({ length: opp.handCount }, (_, i) => ({
+    type: "back",
+    id: i,
+    isRedDora: false,
+  }));
+
+  return {
+    hand,
+    drawnTile: undefined,
+    discards: opp.discards.map(dtoToDiscardEntry),
+    melds: opp.melds.map((m) => dtoToMeldView(m, opp.seatIndex)),
+    score: opp.score,
+  };
+}
+
+// ===== メイン変換 =====
+
+/**
+ * PlayerGameView を GameBoard 用の PlayerViewState[4] に変換する。
+ * 配列順: [0]=self, [1]=下家, [2]=対面, [3]=上家
+ */
+export function gameViewToPlayerViews(view: PlayerGameView): PlayerViewState[] {
+  const mySeat = view.mySeatIndex;
+  const result: PlayerViewState[] = new Array(4);
+
+  // 自分
+  result[0] = selfToViewState(view.self);
+
+  // 他家を相対位置で配置
+  for (const opp of view.opponents) {
+    const rel = (opp.seatIndex - mySeat + 4) % 4; // 1=下家, 2=対面, 3=上家
+    result[rel] = opponentToViewState(opp);
+  }
+
+  return result;
+}
+
+/**
+ * ActionDto[] を ActionButtons 用の { type, label } に変換する。
+ * 打牌(discard)はタイルクリックで処理するため除外する。
+ */
+const ACTION_LABELS: Record<string, string> = {
+  tsumo: "ツモ",
+  ron: "ロン",
+  riichi: "リーチ",
+  discard: "打牌",
+  ankan: "暗槓",
+  kakan: "加槓",
+  minkan: "大明槓",
+  pon: "ポン",
+  chi: "チー",
+  kyuushu_kyuuhai: "九種九牌",
+  skip: "スキップ",
+};
+
+export interface OnlineActionOption {
+  type: string;
+  label: string;
+  dto: ActionDto;
+}
+
+export function buildOnlineActionOptions(actions: ActionDto[]): OnlineActionOption[] {
+  const options: OnlineActionOption[] = [];
+  const seen = new Set<string>();
+
+  for (const dto of actions) {
+    if (dto.type === "discard") continue;
+
+    const key = dto.type === "riichi" ? "riichi" : dto.type === "ankan" ? "ankan" : dto.type;
+    if (!seen.has(key)) {
+      seen.add(key);
+      options.push({
+        type: dto.type,
+        label: ACTION_LABELS[dto.type] ?? dto.type,
+        dto,
+      });
+    }
+  }
+
+  return options;
+}

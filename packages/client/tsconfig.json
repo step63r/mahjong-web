@@ -14,7 +14,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@mahjong-web/domain": ["../domain/src/index.ts"]
+      "@mahjong-web/domain": ["../domain/src/index.ts"],
+      "@mahjong-web/shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src"]

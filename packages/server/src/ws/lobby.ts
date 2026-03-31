@@ -20,6 +20,28 @@ function toRoomDto(room: import("../game/GameManager.js").ActiveRoom): RoomDto {
 }
 
 export function registerLobbyHandlers(io: Server, socket: Socket, gameManager: GameManager) {
+  // ルーム作成
+  socket.on("room:create", (data: { playerName: string; gameType: "tonpu" | "hanchan" }) => {
+    // 既にルームに居る場合はエラー
+    if (socket.data["roomId"]) {
+      socket.emit("room:error", { message: "既にルームに参加しています" });
+      return;
+    }
+
+    const roomId = gameManager.generateRoomId();
+    const room = gameManager.createRoom(roomId, data.gameType, gameManager.getDefaultRuleConfig(data.gameType), {
+      playerName: data.playerName,
+      userId: (socket.data["userId"] as string) ?? null,
+      socketId: socket.id,
+    });
+
+    socket.join(roomId);
+    socket.data["roomId"] = roomId;
+    socket.data["playerName"] = data.playerName;
+
+    socket.emit("room:state", toRoomDto(room));
+  });
+
   // ルームに参加
   socket.on("room:join", (data: { roomId: string; playerName: string }) => {
     const existingRoom = gameManager.getRoom(data.roomId);

@@ -16,10 +16,10 @@ export function TopPage() {
           CPU 対戦
         </button>
         <button
-          disabled
-          className="bg-gray-600 text-gray-400 font-bold py-4 px-8 rounded-xl text-xl cursor-not-allowed"
+          onClick={() => navigate("/lobby")}
+          className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors"
         >
-          対人戦（準備中）
+          対人戦
         </button>
       </div>
 
