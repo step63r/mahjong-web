@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pixi/react": "^8.0.5",
+    "gsap": "^3.14.2",
+    "pixi.js": "^8.17.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.0",
