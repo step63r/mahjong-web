@@ -1,0 +1,140 @@
+/**
+ * 副露レンダリング — 4方向の副露コンテナを更新する
+ *
+ * viewConverter が既に calledTileIndex（横倒し位置）を算出済み。
+ * 暗槓は両端が裏面（showFace=false）。
+ * 起家表示マーカーも副露領域に配置する。
+ */
+import { Container, Graphics, Text, TextStyle } from "pixi.js";
+import type { BoardLayout } from "../layout";
+import type { PlayerViewState, MeldViewData, TileData } from "../../types";
+import {
+  DEALER_MARKER_BG,
+  DEALER_MARKER_TEXT,
+  TILE_ASPECT_RATIO,
+  DEPTH_RATIO_DEFAULT,
+} from "../tiles/constants";
+
+import { createSelfLyingTile, createSelfSidewaysTile } from "../tiles/selfTile";
+import { createShimochaLyingTile, createShimochaSidewaysTile } from "../tiles/shimochaTile";
+import { createToimenLyingTile, createToimenSidewaysTile } from "../tiles/toimenTile";
+import { createKamichaLyingTile, createKamichaSidewaysTile } from "../tiles/kamichaTile";
+
+// ===== 型 =====
+
+type Direction = "self" | "shimocha" | "toimen" | "kamicha";
+
+interface MeldTileCreators {
+  lying: (type: string, isRed: boolean, faceW: number, showFace?: boolean) => Container;
+  sideways: (type: string, isRed: boolean, faceW: number) => Container;
+}
+
+const CREATORS: Record<Direction, MeldTileCreators> = {
+  self: { lying: createSelfLyingTile, sideways: createSelfSidewaysTile },
+  shimocha: { lying: createShimochaLyingTile, sideways: createShimochaSidewaysTile },
+  toimen: { lying: createToimenLyingTile, sideways: createToimenSidewaysTile },
+  kamicha: { lying: createKamichaLyingTile, sideways: createKamichaSidewaysTile },
+};
+
+// ===== メイン =====
+
+/**
+ * 4方向の副露コンテナを更新する
+ */
+export function updateMelds(
+  melds: [Container, Container, Container, Container],
+  layout: BoardLayout,
+  players: readonly PlayerViewState[],
+  dealerIndex: number | undefined,
+  roundWind: string,
+): void {
+  const dirs: Direction[] = ["self", "shimocha", "toimen", "kamicha"];
+  for (let i = 0; i < 4; i++) {
+    renderMeldArea(melds[i], layout, dirs[i], players[i], i === dealerIndex, roundWind);
+  }
+}
+
+// ===== 1方向の副露描画 =====
+
+function renderMeldArea(
+  container: Container,
+  layout: BoardLayout,
+  direction: Direction,
+  player: PlayerViewState | undefined,
+  isDealer: boolean,
+  roundWind: string,
+): void {
+  container.removeChildren();
+  if (!player) return;
+
+  const { tileW } = layout;
+  const { origin, tileStride } = layout[direction].meld;
+  const { lying, sideways } = CREATORS[direction];
+
+  // stride 軸上の累積位置
+  let cursor = { x: 0, y: 0 };
+
+  for (const meld of player.melds) {
+    const isAnkan = meld.meldType === "ankan";
+
+    for (let ti = 0; ti < meld.tiles.length; ti++) {
+      const tile = meld.tiles[ti];
+      const isCalled = ti === meld.calledTileIndex;
+
+      // 暗槓: 両端(index 0, 3)は裏面
+      const showFace = isAnkan ? (ti === 1 || ti === 2) : true;
+
+      let sprite: Container;
+      if (isCalled) {
+        sprite = sideways(tile.type, tile.isRedDora, tileW);
+      } else {
+        sprite = lying(tile.type, tile.isRedDora, tileW, showFace);
+      }
+
+      sprite.x = origin.x + cursor.x;
+      sprite.y = origin.y + cursor.y;
+      container.addChild(sprite);
+
+      // カーソルを進める
+      cursor.x += tileStride.x;
+      cursor.y += tileStride.y;
+    }
+  }
+
+  // 起家表示マーカー
+  if (isDealer) {
+    const markerSize = tileW;
+    const marker = createDealerMarker(markerSize, roundWind);
+    marker.x = origin.x + cursor.x;
+    marker.y = origin.y + cursor.y;
+    container.addChild(marker);
+  }
+}
+
+// ===== 起家表示マーカー =====
+
+function createDealerMarker(size: number, roundWind: string): Container {
+  const container = new Container();
+
+  const bg = new Graphics();
+  bg.fill(DEALER_MARKER_BG);
+  bg.roundRect(0, 0, size, size, size * 0.1);
+  bg.fill();
+  container.addChild(bg);
+
+  const windChar = roundWind === "ton" ? "東" : "南";
+  const style = new TextStyle({
+    fontFamily: "sans-serif",
+    fontSize: size * 0.6,
+    fill: DEALER_MARKER_TEXT,
+    fontWeight: "bold",
+    align: "center",
+  });
+  const text = new Text({ text: windChar, style });
+  text.anchor.set(0.5, 0.5);
+  text.x = size / 2;
+  text.y = size / 2;
+  container.addChild(text);
+
+  return container;
+}
