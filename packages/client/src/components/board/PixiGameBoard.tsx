@@ -10,6 +10,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, BOARD_OFFSET_X, TABLE_COLOR } from "../../
 import { calculateBoardLayout, type BoardLayout } from "../../pixi/layout";
 import { preloadAllTileTextures } from "../../pixi/tiles/tileTexture";
 import { updateHands } from "../../pixi/renderers/handRenderer";
+import { updateDiscards } from "../../pixi/renderers/discardRenderer";
 import type { PlayerViewState, TileData, DiscardEntryData, MeldViewData } from "../../types";
 
 // ===== Props =====
@@ -163,6 +164,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     // TODO Step 5: updateHands(containers.hands, layout, props.players, props.selectedTileIndex)
     updateHands(containers.hands, layout, props.players, props.selectedTileIndex);
     // TODO Step 6: updateDiscards(containers.discards, layout, props.players)
+    updateDiscards(containers.discards, layout, props.players);
     // TODO Step 7: updateMelds(containers.melds, layout, props.players, props.dealerIndex)
     // TODO Step 8: updateInfoPanel(containers.infoPanel, layout, props)
   }, [containers, layout, props]);
