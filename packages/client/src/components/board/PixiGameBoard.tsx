@@ -164,10 +164,8 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     if (!containers) return;
 
     // TODO Step 5: updateHands(containers.hands, layout, props.players, props.selectedTileIndex)
-    updateHands(containers.hands, layout, props.players, props.selectedTileIndex);
-    // TODO Step 6: updateDiscards(containers.discards, layout, props.players)
+    updateHands(containers.hands, layout, props.players, props.selectedTileIndex, props.onTileClick);
     updateDiscards(containers.discards, layout, props.players);
-    // TODO Step 7: updateMelds(containers.melds, layout, props.players, props.dealerIndex)
     updateMelds(containers.melds, layout, props.players, props.dealerIndex, props.roundWind);
   }, [containers, layout, props]);
 

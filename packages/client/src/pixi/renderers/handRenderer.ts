@@ -28,8 +28,9 @@ export function updateHands(
   layout: BoardLayout,
   players: readonly PlayerViewState[],
   selectedTileIndex: number | undefined,
+  onTileClick?: (index: number) => void,
 ): void {
-  renderSelfHand(hands[0], layout, players[0], selectedTileIndex);
+  renderSelfHand(hands[0], layout, players[0], selectedTileIndex, onTileClick);
   renderOpponentHand(hands[1], layout, "shimocha", players[1]);
   renderOpponentHand(hands[2], layout, "toimen", players[2]);
   renderOpponentHand(hands[3], layout, "kamicha", players[3]);
@@ -42,6 +43,7 @@ function renderSelfHand(
   layout: BoardLayout,
   player: PlayerViewState | undefined,
   selectedTileIndex: number | undefined,
+  onTileClick?: (index: number) => void,
 ): void {
   container.removeChildren();
   if (!player) return;
@@ -62,6 +64,14 @@ function renderSelfHand(
       sprite.y += SELECTED_LIFT_Y;
     }
 
+    // クリックインタラクション
+    if (onTileClick) {
+      sprite.eventMode = "static";
+      sprite.cursor = "pointer";
+      const idx = i;
+      sprite.on("pointertap", () => onTileClick(idx));
+    }
+
     container.addChild(sprite);
   }
 
@@ -75,6 +85,13 @@ function renderSelfHand(
 
     if (selectedTileIndex === tsumoIdx) {
       sprite.y += SELECTED_LIFT_Y;
+    }
+
+    // クリックインタラクション
+    if (onTileClick) {
+      sprite.eventMode = "static";
+      sprite.cursor = "pointer";
+      sprite.on("pointertap", () => onTileClick(tsumoIdx));
     }
 
     container.addChild(sprite);
