@@ -50,7 +50,7 @@ export function updateMelds(
 ): void {
   const dirs: Direction[] = ["self", "shimocha", "toimen", "kamicha"];
   for (let i = 0; i < 4; i++) {
-    renderMeldArea(melds[i], layout, dirs[i], players[i], i === dealerIndex, roundWind);
+    renderMeldArea(melds[i], layout, dirs[i], players[i], i === dealerIndex, roundWind, i);
   }
 }
 
@@ -63,6 +63,7 @@ function renderMeldArea(
   player: PlayerViewState | undefined,
   isDealer: boolean,
   roundWind: string,
+  dirIndex: number,
 ): void {
   container.removeChildren();
   if (!player) return;
@@ -104,16 +105,24 @@ function renderMeldArea(
   // 起家表示マーカー
   if (isDealer) {
     const markerSize = tileW;
-    const marker = createDealerMarker(markerSize, roundWind);
-    marker.x = origin.x + cursor.x;
-    marker.y = origin.y + cursor.y;
+    const marker = createDealerMarker(markerSize, roundWind, dirIndex);
+    let mx = origin.x + cursor.x;
+    let my = origin.y + cursor.y;
+    // stride が負方向の場合、マーカーが canvas 外に出ないよう補正
+    if (tileStride.y < 0) my -= markerSize;
+    if (tileStride.x < 0) mx -= markerSize;
+    marker.x = mx;
+    marker.y = my;
     container.addChild(marker);
   }
 }
 
 // ===== 起家表示マーカー =====
 
-function createDealerMarker(size: number, roundWind: string): Container {
+// 各方向の回転角度: 自家=0, 下家=-90, 対面=180, 上家=90 (度)
+const MARKER_ROTATIONS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+
+function createDealerMarker(size: number, roundWind: string, dirIndex: number): Container {
   const container = new Container();
 
   const bg = new Graphics();
@@ -134,6 +143,7 @@ function createDealerMarker(size: number, roundWind: string): Container {
   text.anchor.set(0.5, 0.5);
   text.x = size / 2;
   text.y = size / 2;
+  text.rotation = MARKER_ROTATIONS[dirIndex] ?? 0;
   container.addChild(text);
 
   return container;

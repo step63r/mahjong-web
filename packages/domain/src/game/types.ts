@@ -41,6 +41,8 @@ export interface GameState {
   currentRound: RoundIndex;
   /** 現在の親のインデックス（0-3） */
   dealerIndex: number;
+  /** 起家のインデックス（0-3、ゲーム通して不変） */
+  readonly initialDealerIndex: number;
   /** 本場数 */
   honba: number;
   /** 供託リーチ棒の数 */

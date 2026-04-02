@@ -117,6 +117,7 @@ export function OnlineGamePage() {
   const isMyTurn = uiPhase === "myTurn";
   const relativeCurrentPlayer = toRelative(latestView.activePlayerIndex);
   const relativeDealer = toRelative(latestView.dealerIndex);
+  const relativeInitialDealer = toRelative(latestView.initialDealerIndex);
 
   return (
     <>
@@ -130,6 +131,7 @@ export function OnlineGamePage() {
         doraIndicators={doraIndicators}
         currentPlayer={relativeCurrentPlayer}
         dealerIndex={relativeDealer}
+        initialDealerIndex={relativeInitialDealer}
         selectedTileIndex={isMyTurn ? selectedTileIndex : undefined}
         onTileClick={isMyTurn ? handleTileClick : undefined}
         actionButtons={

@@ -131,6 +131,7 @@ export function GamePage() {
         doraIndicators={doraIndicators}
         currentPlayer={roundState.activePlayerIndex}
         dealerIndex={roundState.dealerIndex}
+        initialDealerIndex={gameState.initialDealerIndex}
         selectedTileIndex={isWaiting ? selectedTileIndex : undefined}
         onTileClick={isWaiting ? handleTileClick : undefined}
         actionButtons={

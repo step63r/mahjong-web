@@ -54,6 +54,8 @@ export function PixiInfoPanel({
   const scoreBar = (idx: number) => {
     const isDealer = dealerIndex === idx;
     const isCurrent = currentPlayer === idx;
+    // 親(dealerIndex)=東, そこから右回りに南西北
+    const windIdx = (idx - (dealerIndex ?? 0) + 4) % 4;
     return (
       <div
         className={`flex items-center justify-between px-2 whitespace-nowrap ${
@@ -66,7 +68,7 @@ export function PixiInfoPanel({
             isCurrent ? "text-yellow-300 font-bold" : "text-gray-200"
           }
         >
-          {SEAT_WINDS[idx]}
+          {SEAT_WINDS[windIdx]}
         </span>
         <span
           className={
@@ -88,78 +90,90 @@ export function PixiInfoPanel({
         width: size,
         height: size,
         pointerEvents: "none",
+        display: "grid",
+        gridTemplateColumns: `${barH}px 1fr ${barH}px`,
+        gridTemplateRows: `${barH}px 1fr ${barH}px`,
+        gridTemplateAreas: `
+          "kamicha toimen  toimen"
+          "kamicha center  shimocha"
+          "self    self    shimocha"
+        `,
       }}
       className="bg-gray-900/80 rounded text-white overflow-hidden"
     >
-      {/* 上辺: 対面 (180° 回転) */}
-      <div style={{ transform: "rotate(180deg)" }}>{scoreBar(2)}</div>
-
-      {/* 中段: 上家 | 中央情報 | 下家 */}
-      <div className="flex" style={{ height: size - barH * 2 }}>
-        {/* 左辺: 上家 (90° 反時計回り) */}
-        <div style={{ width: barH, position: "relative" }}>
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: size - barH * 2,
-              transform: "translate(-50%, -50%) rotate(-90deg)",
-            }}
-          >
-            {scoreBar(3)}
-          </div>
-        </div>
-
-        {/* 中央: 局情報 + ドラ */}
-        <div className="flex-1 flex flex-col items-center justify-center gap-0.5 overflow-hidden">
-          <div
-            style={{ fontSize: Math.max(12, Math.round(size * 0.08)) }}
-            className="font-bold leading-tight"
-          >
-            {windLabel}
-            {roundNumber}局
-          </div>
-          {honba > 0 && (
-            <div
-              style={{ fontSize: Math.max(9, Math.round(size * 0.055)) }}
-              className="text-gray-300 leading-tight"
-            >
-              {honba}本場
-            </div>
-          )}
-          <div
-            style={{ fontSize: Math.max(8, Math.round(size * 0.05)) }}
-            className="text-gray-400 flex gap-2 leading-tight"
-          >
-            <span>供託{riichiSticks * 1000}</span>
-            <span>残{remainingTiles}</span>
-          </div>
-          <div className="flex gap-px mt-0.5">
-            {doraIndicators.map((tile, i) => (
-              <TileView key={i} tile={tile} size={tileSz} />
-            ))}
-          </div>
-        </div>
-
-        {/* 右辺: 下家 (90° 時計回り) */}
-        <div style={{ width: barH, position: "relative" }}>
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: size - barH * 2,
-              transform: "translate(-50%, -50%) rotate(90deg)",
-            }}
-          >
-            {scoreBar(1)}
-          </div>
+      {/* 左上～左中: 上家 (90° 時計回り = 外側向き) */}
+      <div style={{ gridArea: "kamicha", position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: size - barH,
+            transform: "translate(-50%, -50%) rotate(90deg)",
+          }}
+        >
+          {scoreBar(3)}
         </div>
       </div>
 
-      {/* 下辺: 自家 */}
-      {scoreBar(0)}
+      {/* 上中～上右: 対面 (180° 回転) */}
+      <div style={{ gridArea: "toimen", transform: "rotate(180deg)" }}>
+        {scoreBar(2)}
+      </div>
+
+      {/* 中央: 局情報 + ドラ */}
+      <div
+        style={{ gridArea: "center" }}
+        className="flex flex-col items-center justify-center gap-0.5 overflow-hidden"
+      >
+        <div
+          style={{ fontSize: Math.max(12, Math.round(size * 0.08)) }}
+          className="font-bold leading-tight"
+        >
+          {windLabel}
+          {roundNumber}局
+        </div>
+        {honba > 0 && (
+          <div
+            style={{ fontSize: Math.max(9, Math.round(size * 0.055)) }}
+            className="text-gray-300 leading-tight"
+          >
+            {honba}本場
+          </div>
+        )}
+        <div
+          style={{ fontSize: Math.max(8, Math.round(size * 0.05)) }}
+          className="text-gray-400 flex gap-2 leading-tight"
+        >
+          <span>供託{riichiSticks * 1000}</span>
+          <span>残{remainingTiles}</span>
+        </div>
+        <div className="flex gap-px mt-0.5">
+          {doraIndicators.map((tile, i) => (
+            <TileView key={i} tile={tile} size={tileSz} />
+          ))}
+        </div>
+      </div>
+
+      {/* 右中～右下: 下家 (90° 反時計回り = 外側向き) */}
+      <div style={{ gridArea: "shimocha", position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: size - barH,
+            transform: "translate(-50%, -50%) rotate(-90deg)",
+          }}
+        >
+          {scoreBar(1)}
+        </div>
+      </div>
+
+      {/* 下左～下中: 自家 */}
+      <div style={{ gridArea: "self" }}>
+        {scoreBar(0)}
+      </div>
     </div>
   );
 }

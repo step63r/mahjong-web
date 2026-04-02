@@ -137,6 +137,8 @@ export interface PlayerGameView {
   honba: number;
   riichiSticks: number;
   dealerIndex: number;
+  /** 起家のインデックス（ゲーム通して不変） */
+  initialDealerIndex: number;
   turnCount: number;
   /** 現在のフェーズ */
   roundPhase: string;

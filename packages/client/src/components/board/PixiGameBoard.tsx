@@ -26,7 +26,10 @@ export interface PixiGameBoardProps {
   remainingTiles: number;
   doraIndicators: readonly TileData[];
   currentPlayer: number;
+  /** 現在の東家（親）のインデックス */
   dealerIndex?: number;
+  /** 起家のインデックス（ゲーム通して固定） */
+  initialDealerIndex?: number;
   selectedTileIndex?: number;
   onTileClick?: (index: number) => void;
   actionButtons?: React.ReactNode;
@@ -104,7 +107,7 @@ function useBoardContainers(
   ready: boolean,
   layout: BoardLayout,
 ): BoardContainers | null {
-  const containersRef = useRef<BoardContainers | null>(null);
+  const [containers, setContainers] = useState<BoardContainers | null>(null);
 
   useEffect(() => {
     if (!app || !ready) return;
@@ -112,10 +115,10 @@ function useBoardContainers(
     // 既存のステージをクリア
     app.stage.removeChildren();
 
-    // --- 背景: 盤面領域を濃緑で塗る ---
+    // --- 背景: キャンバス全体を濃緑で塗る ---
     const bg = new Graphics();
     bg.fill(TABLE_COLOR);
-    bg.rect(BOARD_OFFSET_X, 0, layout.infoPanel.size + 200, CANVAS_HEIGHT);
+    bg.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     bg.fill();
     app.stage.addChild(bg);
 
@@ -141,14 +144,14 @@ function useBoardContainers(
     boardRoot.addChild(infoPanel);
     for (const c of hands) boardRoot.addChild(c);
 
-    containersRef.current = { hands, discards, melds, infoPanel };
+    setContainers({ hands, discards, melds, infoPanel });
 
     return () => {
-      containersRef.current = null;
+      setContainers(null);
     };
   }, [app, ready, layout]);
 
-  return containersRef.current;
+  return containers;
 }
 
 // ===== メインコンポーネント =====
@@ -166,7 +169,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     // TODO Step 5: updateHands(containers.hands, layout, props.players, props.selectedTileIndex)
     updateHands(containers.hands, layout, props.players, props.selectedTileIndex, props.onTileClick);
     updateDiscards(containers.discards, layout, props.players);
-    updateMelds(containers.melds, layout, props.players, props.dealerIndex, props.roundWind);
+    updateMelds(containers.melds, layout, props.players, props.initialDealerIndex, props.roundWind);
   }, [containers, layout, props]);
 
   return (

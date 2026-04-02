@@ -33,6 +33,7 @@ export function createGame(ruleConfig: RuleConfig, initialDealerIndex?: number):
     ],
     currentRound: { roundWind: TT.Ton, roundNumber: 1 },
     dealerIndex,
+    initialDealerIndex: dealerIndex,
     honba: 0,
     riichiSticks: 0,
     roundHistory: [],
