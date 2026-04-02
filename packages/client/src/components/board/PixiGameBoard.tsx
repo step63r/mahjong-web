@@ -12,6 +12,7 @@ import { preloadAllTileTextures } from "../../pixi/tiles/tileTexture";
 import { updateHands } from "../../pixi/renderers/handRenderer";
 import { updateDiscards } from "../../pixi/renderers/discardRenderer";
 import { updateMelds } from "../../pixi/renderers/meldRenderer";
+import { PixiInfoPanel } from "./PixiInfoPanel";
 import type { PlayerViewState, TileData, DiscardEntryData, MeldViewData } from "../../types";
 
 // ===== Props =====
@@ -168,17 +169,31 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     updateDiscards(containers.discards, layout, props.players);
     // TODO Step 7: updateMelds(containers.melds, layout, props.players, props.dealerIndex)
     updateMelds(containers.melds, layout, props.players, props.dealerIndex, props.roundWind);
-    // TODO Step 8: updateInfoPanel(containers.infoPanel, layout, props)
   }, [containers, layout, props]);
 
   return (
     <div className="flex flex-col h-screen bg-[#1a1a2e] select-none overflow-hidden">
-      {/* Pixi canvas コンテナ */}
+      {/* Pixi canvas + HTML オーバーレイ */}
       <div className="flex-1 flex items-center justify-center">
-        <div
-          ref={containerRef}
-          style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
-        />
+        <div style={{ position: "relative", width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+          <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+          {ready && (
+            <PixiInfoPanel
+              left={BOARD_OFFSET_X + layout.infoPanel.x}
+              top={layout.infoPanel.y}
+              size={layout.infoPanel.size}
+              roundWind={props.roundWind}
+              roundNumber={props.roundNumber}
+              honba={props.honba}
+              riichiSticks={props.riichiSticks}
+              remainingTiles={props.remainingTiles}
+              doraIndicators={props.doraIndicators}
+              scores={props.players.map((p) => p.score)}
+              currentPlayer={props.currentPlayer}
+              dealerIndex={props.dealerIndex}
+            />
+          )}
+        </div>
       </div>
 
       {/* アクションボタン（HTML オーバーレイ） */}
