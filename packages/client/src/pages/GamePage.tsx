@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { GameBoard } from "@/components/board/GameBoard";
+import { PixiGameBoard } from "@/components/board/PixiGameBoard";
 import { ActionButtons } from "@/components/action/ActionButtons";
 import { RoundResultOverlay } from "@/components/overlay/RoundResultOverlay";
 import { DebugPanel } from "@/components/debug/DebugPanel";
@@ -121,7 +121,7 @@ export function GamePage() {
 
   return (
     <>
-      <GameBoard
+      <PixiGameBoard
         players={playerViews}
         roundWind={gameState.currentRound.roundWind}
         roundNumber={gameState.currentRound.roundNumber}

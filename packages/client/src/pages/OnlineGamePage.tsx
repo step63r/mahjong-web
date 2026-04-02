@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { GameBoard } from "@/components/board/GameBoard";
+import { PixiGameBoard } from "@/components/board/PixiGameBoard";
 import { ActionButtons } from "@/components/action/ActionButtons";
 import { useOnlineGameStore } from "@/stores/onlineGameStore";
 import { useOnlineRoomStore } from "@/stores/onlineRoomStore";
@@ -120,7 +120,7 @@ export function OnlineGamePage() {
 
   return (
     <>
-      <GameBoard
+      <PixiGameBoard
         players={playerViews}
         roundWind={latestView.roundWind}
         roundNumber={latestView.roundNumber}
