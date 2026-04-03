@@ -8,7 +8,7 @@ import { useRef, useEffect, useState, type RefObject } from "react";
 import { Application, Container, Graphics } from "pixi.js";
 import { CANVAS_WIDTH, CANVAS_HEIGHT, BOARD_OFFSET_X, TABLE_COLOR } from "../../pixi/tiles/constants";
 import { calculateBoardLayout, type BoardLayout } from "../../pixi/layout";
-import { preloadAllTileTextures } from "../../pixi/tiles/tileTexture";
+import { preloadAllTileAssets } from "../../pixi/tiles/tileAssets";
 import { updateHands } from "../../pixi/renderers/handRenderer";
 import { updateDiscards } from "../../pixi/renderers/discardRenderer";
 import { updateMelds } from "../../pixi/renderers/meldRenderer";
@@ -75,7 +75,7 @@ function usePixiApp(
           return;
         }
         // テクスチャプリロード
-        await preloadAllTileTextures();
+        await preloadAllTileAssets();
 
         if (destroyed) {
           app.destroy(true);

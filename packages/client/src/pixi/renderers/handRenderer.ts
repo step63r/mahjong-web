@@ -4,10 +4,12 @@
 import type { Container } from "pixi.js";
 import type { BoardLayout } from "../layout";
 import type { PlayerViewState, TileData } from "../../types";
-import { createSelfStandingTile } from "../tiles/selfTile";
-import { createShimochaStandingTile } from "../tiles/shimochaTile";
-import { createToimenStandingTile } from "../tiles/toimenTile";
-import { createKamichaStandingTile } from "../tiles/kamichaTile";
+import {
+  createSelfStandingTile,
+  createShimochaStandingTile,
+  createToimenStandingTile,
+  createKamichaStandingTile,
+} from "../tiles/flatTile";
 
 // ===== 選択状態の視覚フィードバック =====
 

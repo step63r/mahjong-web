@@ -8,10 +8,12 @@ import type { BoardLayout, DirectionLayout } from "../layout";
 import type { PlayerViewState, DiscardEntryData } from "../../types";
 import { DISCARD_TILES_PER_ROW } from "../tiles/constants";
 
-import { createSelfLyingTile, createSelfSidewaysTile } from "../tiles/selfTile";
-import { createShimochaLyingTile, createShimochaSidewaysTile } from "../tiles/shimochaTile";
-import { createToimenLyingTile, createToimenSidewaysTile } from "../tiles/toimenTile";
-import { createKamichaLyingTile, createKamichaSidewaysTile } from "../tiles/kamichaTile";
+import {
+  createSelfLyingTile, createSelfSidewaysTile,
+  createShimochaLyingTile, createShimochaSidewaysTile,
+  createToimenLyingTile, createToimenSidewaysTile,
+  createKamichaLyingTile, createKamichaSidewaysTile,
+} from "../tiles/flatTile";
 
 // ===== 方向ごとの牌生成マップ =====
 
@@ -41,21 +43,17 @@ const CREATORS: Record<Direction, TileCreators> = {
  *
  * 簡易計算: sideways牌の stride 軸サイズ - lying牌の stride 軸サイズ
  */
-function getSidewaysExtraSize(direction: Direction, tileW: number, faceH: number, depthDefault: number): { dx: number; dy: number } {
+function getSidewaysExtraSize(direction: Direction, tileW: number, faceH: number, _depthDefault: number): { dx: number; dy: number } {
+  // 2D フラット: lying と sideways のサイズは同じなので差分は 0
+  void tileW;
+  void faceH;
   switch (direction) {
     case "self":
-      // lying stride x = faceH, sideways width = depthDefault + faceH → extra x = depthDefault
-      return { dx: depthDefault, dy: 0 };
     case "toimen":
-      // lying stride x = -faceH (右→左), sideways width = faceW + depthDefault
-      // 対面の sideways は (faceW + depthW) 幅。lying は faceH 幅。stride が負なので extra は負
-      return { dx: -(tileW + depthDefault - faceH), dy: 0 };
+      return { dx: 0, dy: 0 };
     case "shimocha":
-      // lying stride y = -faceH (下→上), sideways height = depthDefault + faceW
-      return { dx: 0, dy: -(depthDefault + tileW - faceH) };
     case "kamicha":
-      // lying stride y = faceH (上→下), sideways height = faceW + depthDefault
-      return { dx: 0, dy: depthDefault + tileW - faceH };
+      return { dx: 0, dy: 0 };
   }
 }
 

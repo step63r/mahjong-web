@@ -7,8 +7,6 @@
 import {
   BOARD_SIZE,
   TILE_ASPECT_RATIO,
-  DEPTH_RATIO_SELF_HAND,
-  DEPTH_RATIO_DEFAULT,
   TSUMO_GAP,
   DISCARD_TILES_PER_ROW,
 } from "./tiles/constants";
@@ -76,18 +74,18 @@ const PADDING = 4;
  * 盤面サイズから全レイアウト情報を算出する
  */
 export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
-  // --- tileW 導出 ---
+  // --- tileW 導出 (2D フラット) ---
   // (boardSize - 6*tileW) / 2 ≥ 4*lyingH + standH + PADDING
-  // lyingH = (1 + DEPTH_RATIO_DEFAULT) * tileW
-  // standH = TILE_ASPECT_RATIO * (1 + DEPTH_RATIO_SELF_HAND) * tileW
-  const lyingCoeff = 4 * (1 + DEPTH_RATIO_DEFAULT);
-  const handCoeff = TILE_ASPECT_RATIO * (1 + DEPTH_RATIO_SELF_HAND);
+  // lyingH = tileW（厚みなし）
+  // standH = TILE_ASPECT_RATIO * tileW = faceH
+  const lyingCoeff = 4; // 4行分 × tileW
+  const handCoeff = TILE_ASPECT_RATIO;
   const totalCoeff = lyingCoeff + handCoeff + 3; // 3 = infoPanelSide/2 / tileW
   const tileW = Math.floor((boardSize / 2 - PADDING) / totalCoeff);
 
   const faceH = tileW * TILE_ASPECT_RATIO;
-  const depthSelf = faceH * DEPTH_RATIO_SELF_HAND;
-  const depthDefault = tileW * DEPTH_RATIO_DEFAULT;
+  const depthSelf = 0;
+  const depthDefault = 0;
 
   // --- 情報パネル ---
   const ipSide = 6 * tileW;
@@ -95,10 +93,10 @@ export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
   const ipRight = ipXY + ipSide;
   const ipBottom = ipXY + ipSide;
 
-  // --- 共通サイズ ---
-  const lyingW = faceH; // 自家倒牌の横幅
-  const lyingH = tileW + depthDefault; // 自家倒牌の高さ
-  const sideLyingW = depthDefault + tileW; // 下家/上家 倒牌の横幅
+  // --- 共通サイズ (2D: 厚みなし) ---
+  const lyingW = faceH; // 自家/対面 倒牌の横幅
+  const lyingH = tileW; // 自家/対面 倒牌の高さ
+  const sideLyingW = tileW; // 下家/上家 倒牌の横幅
 
   // --- 捨て牌エリアの中央揃え幅 ---
   const discardRowW = DISCARD_TILES_PER_ROW * lyingW;
@@ -163,16 +161,16 @@ export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
  * 下家 (right): 手牌は右端を縦に下→上、捨て牌は情報パネル右辺から右へ下→上
  */
 function calculateShimochaLayout(
-  boardSize: number, tileW: number, faceH: number, depthDefault: number,
+  boardSize: number, tileW: number, faceH: number, _depthDefault: number,
   ipRight: number, centerY: number, discardRowH: number, sideLyingW: number,
 ): DirectionLayout {
-  // 手牌: 右端に縦並び（下から上へ）。立牌 top face = faceH × depthDefault
-  const handTotalH = HAND_TILES * depthDefault;
-  const handOriginY = centerY + handTotalH / 2 - depthDefault;
+  // 手牌: 右端に縦並び（下から上へ）。立牌サイズ = faceH × faceW
+  const handTotalH = HAND_TILES * tileW;
+  const handOriginY = centerY + handTotalH / 2 - tileW;
   return {
     hand: {
       origin: { x: boardSize - faceH, y: handOriginY },
-      stride: { x: 0, y: -depthDefault },
+      stride: { x: 0, y: -tileW },
       tsumoGap: { x: 0, y: -TSUMO_GAP },
     },
     discard: {
@@ -222,16 +220,16 @@ function calculateToimenLayout(
  * 上家 (left): 下家の左右反転。手牌は左端を縦に上→下、捨て牌は情報パネル左辺から左へ上→下
  */
 function calculateKamichaLayout(
-  boardSize: number, tileW: number, faceH: number, depthDefault: number,
+  boardSize: number, tileW: number, faceH: number, _depthDefault: number,
   ipXY: number, centerY: number, discardRowH: number, sideLyingW: number,
 ): DirectionLayout {
-  // 手牌: 左端に縦並び（上から下へ）。立牌 top face = faceH × depthDefault
-  const handTotalH = HAND_TILES * depthDefault;
+  // 手牌: 左端に縦並び（上から下へ）。立牌サイズ = faceH × faceW
+  const handTotalH = HAND_TILES * tileW;
   const handOriginY = centerY - handTotalH / 2;
   return {
     hand: {
       origin: { x: 0, y: handOriginY },
-      stride: { x: 0, y: depthDefault },
+      stride: { x: 0, y: tileW },
       tsumoGap: { x: 0, y: TSUMO_GAP },
     },
     discard: {

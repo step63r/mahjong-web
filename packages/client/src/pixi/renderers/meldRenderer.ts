@@ -12,13 +12,14 @@ import {
   DEALER_MARKER_BG,
   DEALER_MARKER_TEXT,
   TILE_ASPECT_RATIO,
-  DEPTH_RATIO_DEFAULT,
 } from "../tiles/constants";
 
-import { createSelfLyingTile, createSelfSidewaysTile } from "../tiles/selfTile";
-import { createShimochaLyingTile, createShimochaSidewaysTile } from "../tiles/shimochaTile";
-import { createToimenLyingTile, createToimenSidewaysTile } from "../tiles/toimenTile";
-import { createKamichaLyingTile, createKamichaSidewaysTile } from "../tiles/kamichaTile";
+import {
+  createSelfLyingTile, createSelfSidewaysTile,
+  createShimochaLyingTile, createShimochaSidewaysTile,
+  createToimenLyingTile, createToimenSidewaysTile,
+  createKamichaLyingTile, createKamichaSidewaysTile,
+} from "../tiles/flatTile";
 
 // ===== 型 =====
 
