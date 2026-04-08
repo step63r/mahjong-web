@@ -90,6 +90,55 @@ export function createSelfDiscardTile(
 }
 
 /**
+ * 自家の副露牌（正位置）: 表面/裏面 faceW × faceH
+ * 暗槓の裏面牌にも対応（showFace=false で裏面表示）
+ */
+export function createSelfMeldTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+  showFace = true,
+): Container {
+  const faceH = faceW * TILE_ASPECT_RATIO;
+  const container = new Container();
+  if (showFace) container.addChild(whiteBg(faceW, faceH));
+  const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
+  const scale = showFace ? SPRITE_SCALE : 1;
+  if (s) {
+    s.width = faceW * scale;
+    s.height = faceH * scale;
+    s.x = faceW * (1 - scale) / 2;
+    s.y = faceH * (1 - scale) / 2;
+    container.addChild(s);
+  }
+  return container;
+}
+
+/**
+ * 自家の副露鳴き牌（正位置左90°回転）: 表面 faceH × faceW
+ */
+export function createSelfMeldCalledTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+): Container {
+  const faceH = faceW * TILE_ASPECT_RATIO;
+  const container = new Container();
+  container.addChild(whiteBg(faceH, faceW));
+  const s = faceSprite(tileType, isRedDora);
+  if (s) {
+    s.anchor.set(0.5, 0.5);
+    s.rotation = -Math.PI / 2;
+    s.width = faceW * SPRITE_SCALE;
+    s.height = faceH * SPRITE_SCALE;
+    s.x = faceH / 2;
+    s.y = faceW / 2;
+    container.addChild(s);
+  }
+  return container;
+}
+
+/**
  * 自家の倒牌（河/副露）: 表面 faceH × faceW（横倒し）
  */
 export function createSelfLyingTile(
@@ -100,7 +149,7 @@ export function createSelfLyingTile(
 ): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceH, faceW));
+  if (showFace) container.addChild(whiteBg(faceH, faceW));
   const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
   const scale = showFace ? SPRITE_SCALE : 1;
   if (s) {
@@ -136,7 +185,6 @@ export function createSelfSidewaysTile(
 export function createShimochaStandingTile(faceW: number): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceH, faceW));
   const s = backSprite();
   if (s) {
     s.anchor.set(0.5, 0.5);
@@ -214,7 +262,7 @@ export function createShimochaLyingTile(
 ): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceW, faceH));
+  if (showFace) container.addChild(whiteBg(faceW, faceH));
   const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
   const scale = showFace ? SPRITE_SCALE : 1;
   if (s) {
@@ -250,7 +298,6 @@ export function createShimochaSidewaysTile(
 export function createToimenStandingTile(faceW: number): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceW, faceH));
   const s = backSprite();
   if (s) {
     s.anchor.set(0.5, 0.5);
@@ -323,7 +370,7 @@ export function createToimenLyingTile(
 ): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceH, faceW));
+  if (showFace) container.addChild(whiteBg(faceH, faceW));
   const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
   const scale = showFace ? SPRITE_SCALE : 1;
   if (s) {
@@ -359,7 +406,6 @@ export function createToimenSidewaysTile(
 export function createKamichaStandingTile(faceW: number): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceH, faceW));
   const s = backSprite();
   if (s) {
     s.anchor.set(0.5, 0.5);
@@ -435,7 +481,7 @@ export function createKamichaLyingTile(
 ): Container {
   const faceH = faceW * TILE_ASPECT_RATIO;
   const container = new Container();
-  container.addChild(whiteBg(faceW, faceH));
+  if (showFace) container.addChild(whiteBg(faceW, faceH));
   const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
   const scale = showFace ? SPRITE_SCALE : 1;
   if (s) {

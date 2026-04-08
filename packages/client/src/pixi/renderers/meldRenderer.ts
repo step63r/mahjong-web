@@ -16,6 +16,7 @@ import {
 
 import {
   createSelfLyingTile, createSelfSidewaysTile,
+  createSelfMeldTile, createSelfMeldCalledTile,
   createShimochaLyingTile, createShimochaSidewaysTile,
   createToimenLyingTile, createToimenSidewaysTile,
   createKamichaLyingTile, createKamichaSidewaysTile,
@@ -31,7 +32,7 @@ interface MeldTileCreators {
 }
 
 const CREATORS: Record<Direction, MeldTileCreators> = {
-  self: { lying: createSelfLyingTile, sideways: createSelfSidewaysTile },
+  self: { lying: createSelfMeldTile, sideways: createSelfMeldCalledTile },
   shimocha: { lying: createShimochaLyingTile, sideways: createShimochaSidewaysTile },
   toimen: { lying: createToimenLyingTile, sideways: createToimenSidewaysTile },
   kamicha: { lying: createKamichaLyingTile, sideways: createKamichaSidewaysTile },
@@ -69,17 +70,43 @@ function renderMeldArea(
   container.removeChildren();
   if (!player) return;
 
-  const { tileW } = layout;
+  const { tileW, faceH } = layout;
   const { origin, tileStride } = layout[direction].meld;
   const { lying, sideways } = CREATORS[direction];
+
+  // stride 方向の単位ベクトル（正規化）
+  const strideAxis = tileStride.x !== 0
+    ? { x: Math.sign(tileStride.x), y: 0 }
+    : { x: 0, y: Math.sign(tileStride.y) };
+
+  // stride と直交する軸（横倒し牌の下揃え補正に使用）
+  // 自家: stride=x軸, cross=y軸(下揃え → +方向)
+  const crossAxis = strideAxis.x !== 0
+    ? { x: 0, y: 1 }
+    : { x: 1, y: 0 };
+
+  // 副露セット間のギャップ
+  const MELD_GAP = 20;
 
   // stride 軸上の累積位置
   let cursor = { x: 0, y: 0 };
 
-  for (const meld of player.melds) {
+  for (let mi = 0; mi < player.melds.length; mi++) {
+    const meld = player.melds[mi];
     const isAnkan = meld.meldType === "ankan";
 
-    for (let ti = 0; ti < meld.tiles.length; ti++) {
+    // セット間ギャップ
+    if (mi > 0) {
+      cursor.x += strideAxis.x * MELD_GAP;
+      cursor.y += strideAxis.y * MELD_GAP;
+    }
+
+    // viewConverter は牌を視覚的な左→右順で配列する。
+    // stride が負方向（右→左 / 下→上）の場合、描画順を逆にして一致させる。
+    const reverseOrder = (strideAxis.x + strideAxis.y) < 0;
+
+    for (let rawIdx = 0; rawIdx < meld.tiles.length; rawIdx++) {
+      const ti = reverseOrder ? (meld.tiles.length - 1 - rawIdx) : rawIdx;
       const tile = meld.tiles[ti];
       const isCalled = ti === meld.calledTileIndex;
 
@@ -93,13 +120,32 @@ function renderMeldArea(
         sprite = lying(tile.type, tile.isRedDora, tileW, showFace);
       }
 
+      // 牌の stride 軸サイズ
+      const tileSize = isCalled ? faceH : tileW;
+
+      // 負方向 stride: 先にカーソルを進めてから配置（異サイズ牌の隙間防止）
+      if (reverseOrder) {
+        cursor.x += strideAxis.x * tileSize;
+        cursor.y += strideAxis.y * tileSize;
+      }
+
       sprite.x = origin.x + cursor.x;
       sprite.y = origin.y + cursor.y;
+
+      // 横倒し牌は高さが tileW (< faceH) なので、正位置牌の下端に揃える
+      if (isCalled) {
+        const heightDiff = faceH - tileW;
+        sprite.x += crossAxis.x * heightDiff;
+        sprite.y += crossAxis.y * heightDiff;
+      }
+
       container.addChild(sprite);
 
-      // カーソルを進める
-      cursor.x += tileStride.x;
-      cursor.y += tileStride.y;
+      // 正方向 stride: 配置後にカーソルを進める
+      if (!reverseOrder) {
+        cursor.x += strideAxis.x * tileSize;
+        cursor.y += strideAxis.y * tileSize;
+      }
     }
   }
 

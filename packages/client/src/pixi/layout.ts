@@ -120,8 +120,8 @@ export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
       rowOffset: { x: 0, y: faceH },
     },
     meld: {
-      origin: { x: boardSize, y: boardSize - lyingH },
-      tileStride: { x: -lyingW, y: 0 },
+      origin: { x: boardSize, y: boardSize - faceH },
+      tileStride: { x: -tileW, y: 0 },
     },
   };
 
