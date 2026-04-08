@@ -100,6 +100,7 @@ export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
 
   // --- 捨て牌エリアの中央揃え幅 ---
   const discardRowW = DISCARD_TILES_PER_ROW * lyingW;
+  const selfDiscardRowW = DISCARD_TILES_PER_ROW * tileW; // 自家は正位置（tileW幅）
   const discardRowH = DISCARD_TILES_PER_ROW * faceH; // 縦方向（下家/上家）
   const centerX = boardSize / 2;
   const centerY = boardSize / 2;
@@ -114,9 +115,9 @@ export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
       tsumoGap: { x: TSUMO_GAP, y: 0 },
     },
     discard: {
-      origin: { x: centerX - discardRowW / 2, y: ipBottom },
-      stride: { x: lyingW, y: 0 },
-      rowOffset: { x: 0, y: lyingH },
+      origin: { x: centerX - selfDiscardRowW / 2, y: ipBottom },
+      stride: { x: tileW, y: 0 },
+      rowOffset: { x: 0, y: faceH },
     },
     meld: {
       origin: { x: boardSize, y: boardSize - lyingH },
@@ -162,11 +163,13 @@ export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
  */
 function calculateShimochaLayout(
   boardSize: number, tileW: number, faceH: number, _depthDefault: number,
-  ipRight: number, centerY: number, discardRowH: number, sideLyingW: number,
+  ipRight: number, centerY: number, _discardRowH: number, sideLyingW: number,
 ): DirectionLayout {
+  const shimochaDiscardRowH = DISCARD_TILES_PER_ROW * tileW;
   // 手牌: 右端に縦並び（下から上へ）。立牌サイズ = faceH × faceW
   const handTotalH = HAND_TILES * tileW;
   const handOriginY = centerY + handTotalH / 2 - tileW;
+  // 捨て牌: 正位置左90°→ faceH × tileW。strideは縦方向 -tileW
   return {
     hand: {
       origin: { x: boardSize - faceH, y: handOriginY },
@@ -174,10 +177,9 @@ function calculateShimochaLayout(
       tsumoGap: { x: 0, y: -TSUMO_GAP },
     },
     discard: {
-      // 牌0 = 行0最下部。行は情報パネル右辺から右へ、牌は下→上
-      origin: { x: ipRight, y: centerY + discardRowH / 2 - faceH },
-      stride: { x: 0, y: -faceH },
-      rowOffset: { x: sideLyingW, y: 0 },
+      origin: { x: ipRight, y: centerY + shimochaDiscardRowH / 2 - tileW },
+      stride: { x: 0, y: -tileW },
+      rowOffset: { x: faceH, y: 0 },
     },
     meld: {
       // 上端から下へ（下家の右=画面上）
@@ -192,8 +194,9 @@ function calculateShimochaLayout(
  */
 function calculateToimenLayout(
   boardSize: number, tileW: number, faceH: number, depthDefault: number,
-  ipXY: number, centerX: number, discardRowW: number, lyingW: number, lyingH: number,
+  ipXY: number, centerX: number, _discardRowW: number, lyingW: number, _lyingH: number,
 ): DirectionLayout {
+  const toimenDiscardRowW = DISCARD_TILES_PER_ROW * tileW;
   // 手牌: 上端に横並び（右から左へ）。立牌 = tileW × (faceH + depthDefault)
   const handOriginX = centerX + (HAND_TILES * tileW) / 2 - tileW;
   return {
@@ -204,9 +207,9 @@ function calculateToimenLayout(
     },
     discard: {
       // 牌0 = 行0最右部。行は情報パネル上辺から上へ、牌は右→左
-      origin: { x: centerX + discardRowW / 2 - lyingW, y: ipXY - lyingH },
-      stride: { x: -lyingW, y: 0 },
-      rowOffset: { x: 0, y: -lyingH },
+      origin: { x: centerX + toimenDiscardRowW / 2 - tileW, y: ipXY - faceH },
+      stride: { x: -tileW, y: 0 },
+      rowOffset: { x: 0, y: -faceH },
     },
     meld: {
       // 左端から右へ（対面の右=画面左）
@@ -221,8 +224,9 @@ function calculateToimenLayout(
  */
 function calculateKamichaLayout(
   boardSize: number, tileW: number, faceH: number, _depthDefault: number,
-  ipXY: number, centerY: number, discardRowH: number, sideLyingW: number,
+  ipXY: number, centerY: number, _discardRowH: number, sideLyingW: number,
 ): DirectionLayout {
+  const kamichaDiscardRowH = DISCARD_TILES_PER_ROW * tileW;
   // 手牌: 左端に縦並び（上から下へ）。立牌サイズ = faceH × faceW
   const handTotalH = HAND_TILES * tileW;
   const handOriginY = centerY - handTotalH / 2;
@@ -234,9 +238,9 @@ function calculateKamichaLayout(
     },
     discard: {
       // 牌0 = 行0最上部。行は情報パネル左辺から左へ、牌は上→下
-      origin: { x: ipXY - sideLyingW, y: centerY - discardRowH / 2 },
-      stride: { x: 0, y: faceH },
-      rowOffset: { x: -sideLyingW, y: 0 },
+      origin: { x: ipXY - faceH, y: centerY - kamichaDiscardRowH / 2 },
+      stride: { x: 0, y: tileW },
+      rowOffset: { x: -faceH, y: 0 },
     },
     meld: {
       // 下端から上へ（上家の右=画面下）

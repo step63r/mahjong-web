@@ -5,7 +5,7 @@
  * 1 辺 = 6 × tileW の正方形。各辺にプレイヤー得点を配置し、
  * 中央に局情報・ドラ表示牌を表示する。
  */
-import { TileView } from "../tile/TileView";
+import { getTileFaceUrl } from "../../pixi/tiles/tileAssets";
 import type { TileData } from "../../types";
 
 const WIND_LABELS: Record<string, string> = {
@@ -150,7 +150,14 @@ export function PixiInfoPanel({
         </div>
         <div className="flex gap-px mt-0.5">
           {doraIndicators.map((tile, i) => (
-            <TileView key={i} tile={tile} size={tileSz} />
+            <img
+              key={i}
+              src={getTileFaceUrl(tile.type, tile.isRedDora)}
+              alt={tile.type}
+              width={tileSz}
+              height={Math.round(tileSz * (4 / 3))}
+              style={{ background: "white", borderRadius: 2, padding: `${Math.round(tileSz * 0.1)}px`, boxSizing: "border-box" }}
+            />
           ))}
         </div>
       </div>

@@ -107,6 +107,16 @@ async function loadTexture(key: string, url: string): Promise<Texture> {
 // ===== 公開 API =====
 
 /**
+ * 牌の SVG 画像 URL を取得（HTML <img> 用）
+ */
+export function getTileFaceUrl(tileType: string, isRedDora: boolean): string {
+  if (isRedDora) {
+    return RED_DORA_URLS[tileType] ?? FACE_URLS[tileType] ?? imgFront;
+  }
+  return FACE_URLS[tileType] ?? imgFront;
+}
+
+/**
  * 牌の表面テクスチャを取得（非同期・キャッシュ済み）
  */
 export function getTileFaceTexture(tileType: string, isRedDora: boolean): Promise<Texture> {

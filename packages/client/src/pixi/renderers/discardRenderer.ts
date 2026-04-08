@@ -10,9 +10,13 @@ import { DISCARD_TILES_PER_ROW } from "../tiles/constants";
 
 import {
   createSelfLyingTile, createSelfSidewaysTile,
+  createSelfDiscardTile,
   createShimochaLyingTile, createShimochaSidewaysTile,
+  createShimochaDiscardTile, createShimochaRiichiTile,
   createToimenLyingTile, createToimenSidewaysTile,
+  createToimenDiscardTile, createToimenRiichiTile,
   createKamichaLyingTile, createKamichaSidewaysTile,
+  createKamichaDiscardTile, createKamichaRiichiTile,
 } from "../tiles/flatTile";
 
 // ===== 方向ごとの牌生成マップ =====
@@ -25,10 +29,10 @@ interface TileCreators {
 }
 
 const CREATORS: Record<Direction, TileCreators> = {
-  self: { lying: createSelfLyingTile, sideways: createSelfSidewaysTile },
-  shimocha: { lying: createShimochaLyingTile, sideways: createShimochaSidewaysTile },
-  toimen: { lying: createToimenLyingTile, sideways: createToimenSidewaysTile },
-  kamicha: { lying: createKamichaLyingTile, sideways: createKamichaSidewaysTile },
+  self: { lying: createSelfDiscardTile, sideways: createSelfSidewaysTile },
+  shimocha: { lying: createShimochaDiscardTile, sideways: createShimochaRiichiTile },
+  toimen: { lying: createToimenDiscardTile, sideways: createToimenRiichiTile },
+  kamicha: { lying: createKamichaDiscardTile, sideways: createKamichaRiichiTile },
 };
 
 // ===== 横倒し牌のサイズ差分を方向ごとに取得 =====
@@ -49,11 +53,13 @@ function getSidewaysExtraSize(direction: Direction, tileW: number, faceH: number
   void faceH;
   switch (direction) {
     case "self":
+      return { dx: faceH - tileW, dy: 0 };
     case "toimen":
-      return { dx: 0, dy: 0 };
+      return { dx: -(faceH - tileW), dy: 0 };
     case "shimocha":
+      return { dx: 0, dy: -(faceH - tileW) };
     case "kamicha":
-      return { dx: 0, dy: 0 };
+      return { dx: 0, dy: faceH - tileW };
   }
 }
 
