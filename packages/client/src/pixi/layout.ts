@@ -5,7 +5,6 @@
  * 制約: 情報パネルの1辺 = 6 × tileW（牌の表面幅）
  */
 import {
-  BOARD_SIZE,
   TILE_ASPECT_RATIO,
   TSUMO_GAP,
   DISCARD_TILES_PER_ROW,
@@ -73,7 +72,7 @@ const PADDING = 4;
 /**
  * 盤面サイズから全レイアウト情報を算出する
  */
-export function calculateBoardLayout(boardSize = BOARD_SIZE): BoardLayout {
+export function calculateBoardLayout(boardSize = 720): BoardLayout {
   // --- tileW 導出 (2D フラット) ---
   // (boardSize - 6*tileW) / 2 ≥ 4*lyingH + standH + PADDING
   // lyingH = tileW（厚みなし）

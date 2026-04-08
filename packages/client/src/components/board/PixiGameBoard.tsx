@@ -4,9 +4,9 @@
  * Pixi Application の生成・破棄、テクスチャのプリロード、
  * コンテナ階層の構築を行う。各領域の実際の描画は Step 5〜8 で実装する。
  */
-import { useRef, useEffect, useState, type RefObject } from "react";
+import { useRef, useEffect, useState, useMemo, type RefObject } from "react";
 import { Application, Container, Graphics } from "pixi.js";
-import { CANVAS_WIDTH, CANVAS_HEIGHT, BOARD_OFFSET_X, TABLE_COLOR } from "../../pixi/tiles/constants";
+import { TABLE_COLOR } from "../../pixi/tiles/constants";
 import { calculateBoardLayout, type BoardLayout } from "../../pixi/layout";
 import { preloadAllTileAssets } from "../../pixi/tiles/tileAssets";
 import { updateHands } from "../../pixi/renderers/handRenderer";
@@ -48,10 +48,25 @@ export interface BoardContainers {
   infoPanel: Container;
 }
 
+// ===== フック: 画面高さに連動する盤面サイズ =====
+
+function useBoardSize(): number {
+  const [size, setSize] = useState(() => window.innerHeight);
+
+  useEffect(() => {
+    const onResize = () => setSize(window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return size;
+}
+
 // ===== フック: Pixi Application 管理 =====
 
 function usePixiApp(
   containerRef: RefObject<HTMLDivElement | null>,
+  boardSize: number,
 ): { app: Application | null; ready: boolean } {
   const appRef = useRef<Application | null>(null);
   const [ready, setReady] = useState(false);
@@ -62,8 +77,8 @@ function usePixiApp(
 
     app
       .init({
-        width: CANVAS_WIDTH,
-        height: CANVAS_HEIGHT,
+        width: boardSize,
+        height: boardSize,
         backgroundColor: 0x1a1a2e,
         antialias: true,
         resolution: window.devicePixelRatio || 1,
@@ -106,6 +121,7 @@ function useBoardContainers(
   app: Application | null,
   ready: boolean,
   layout: BoardLayout,
+  boardSize: number,
 ): BoardContainers | null {
   const [containers, setContainers] = useState<BoardContainers | null>(null);
 
@@ -118,13 +134,12 @@ function useBoardContainers(
     // --- 背景: キャンバス全体を濃緑で塗る ---
     const bg = new Graphics();
     bg.fill(TABLE_COLOR);
-    bg.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    bg.rect(0, 0, boardSize, boardSize);
     bg.fill();
     app.stage.addChild(bg);
 
-    // --- 盤面ルートコンテナ（オフセット適用） ---
+    // --- 盤面ルートコンテナ ---
     const boardRoot = new Container();
-    boardRoot.x = BOARD_OFFSET_X;
     app.stage.addChild(boardRoot);
 
     // --- コンテナ階層 ---
@@ -158,9 +173,16 @@ function useBoardContainers(
 
 export function PixiGameBoard(props: PixiGameBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { app, ready } = usePixiApp(containerRef);
-  const layout = useRef(calculateBoardLayout()).current;
-  const containers = useBoardContainers(app, ready, layout);
+  const boardSize = useBoardSize();
+  const { app, ready } = usePixiApp(containerRef, boardSize);
+  const layout = useMemo(() => calculateBoardLayout(boardSize), [boardSize]);
+  const containers = useBoardContainers(app, ready, layout, boardSize);
+
+  // --- リサイズ時にキャンバスサイズ追従 ---
+  useEffect(() => {
+    if (!app || !ready) return;
+    app.renderer.resize(boardSize, boardSize);
+  }, [app, ready, boardSize]);
 
   // --- 描画更新 (Step 5〜8 で各 update 関数を呼ぶ) ---
   useEffect(() => {
@@ -176,11 +198,11 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     <div className="flex flex-col h-screen bg-[#1a1a2e] select-none overflow-hidden">
       {/* Pixi canvas + HTML オーバーレイ */}
       <div className="flex-1 flex items-center justify-center">
-        <div style={{ position: "relative", width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+        <div style={{ position: "relative", width: boardSize, height: boardSize }}>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
           {ready && (
             <PixiInfoPanel
-              left={BOARD_OFFSET_X + layout.infoPanel.x}
+              left={layout.infoPanel.x}
               top={layout.infoPanel.y}
               size={layout.infoPanel.size}
               roundWind={props.roundWind}

@@ -79,18 +79,6 @@ export const TILE_FACE_MAP: Record<SeatDirection, Record<TileState, TileFaces>> 
   },
 };
 
-// ===== キャンバス =====
-
-/** デザイン上のキャンバスサイズ */
-export const CANVAS_WIDTH = 1280;
-export const CANVAS_HEIGHT = 720;
-
-/** 盤面（正方形）のサイズ */
-export const BOARD_SIZE = 720;
-
-/** 盤面のX方向オフセット（中央揃え） */
-export const BOARD_OFFSET_X = (CANVAS_WIDTH - BOARD_SIZE) / 2;
-
 // ===== 起家表示 =====
 
 /** 起家表示の背景色 */
