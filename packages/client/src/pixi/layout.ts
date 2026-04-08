@@ -79,7 +79,7 @@ export function calculateBoardLayout(boardSize = 720): BoardLayout {
   // standH = TILE_ASPECT_RATIO * tileW = faceH
   const lyingCoeff = 4; // 4行分 × tileW
   const handCoeff = TILE_ASPECT_RATIO;
-  const totalCoeff = lyingCoeff + handCoeff + 3; // 3 = infoPanelSide/2 / tileW
+  const totalCoeff = 10;
   const tileW = Math.floor((boardSize / 2 - PADDING) / totalCoeff);
 
   const faceH = tileW * TILE_ASPECT_RATIO;
