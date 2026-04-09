@@ -1,6 +1,8 @@
 # ===== Stage 1: ビルド =====
 FROM node:22-slim AS builder
 
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # 依存関係ファイルをコピー
@@ -29,6 +31,8 @@ RUN npm run build --workspace=packages/server
 # ===== Stage 2: 実行 =====
 FROM node:22-slim AS runner
 
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # 本番依存のみインストール
@@ -55,4 +59,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # マイグレーション実行後にサーバー起動
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=packages/server/prisma/schema.prisma && node packages/server/dist/index.js"]
+CMD ["sh", "-c", "cd packages/server && npx prisma migrate deploy && cd /app && node packages/server/dist/index.js"]
