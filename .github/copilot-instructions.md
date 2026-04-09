@@ -99,11 +99,17 @@
 
 - **ランタイム**: Node.js 22.x
 - **言語**: TypeScript 5.9（strict モード）
-- **ビルド**: tsc（プロジェクト参照 / `--build`）
+- **フロントエンド**: React 19 + Vite + Pixi.js v8（2D 盤面レンダリング）+ Zustand（状態管理）
+- **バックエンド**: Fastify 5.x + Socket.IO 4.x（対人戦リアルタイム通信）
+- **データベース**: PostgreSQL 17（Prisma 7 ORM + `@prisma/adapter-pg`）
+- **認証**: Firebase Authentication（Google Sign-In）
+- **ビルド**: tsc（プロジェクト参照 / `--build`）、Vite（クライアント）
 - **テスト**: Vitest 4.x
 - **リンター**: ESLint（flat config）
 - **フォーマッター**: Prettier
 - **パッケージ管理**: npm workspaces（モノレポ）
+- **コンテナ**: Docker（node:22-slim マルチステージビルド）
+- **デプロイ**: AWS — S3 + CloudFront（フロント）、App Runner（バックエンド）、RDS PostgreSQL（DB）
 
 ## プロジェクト構成と役割
 
@@ -111,11 +117,15 @@
 mahjong-web/
 ├── .github/
 │   └── copilot-instructions.md   # Copilot / AI ツール向けガイド
+├── .dockerignore                  # Docker ビルド除外設定
 ├── .gitignore
 ├── .prettierignore
 ├── .prettierrc                    # Prettier 設定
+├── docker-compose.yml             # ローカル開発用 PostgreSQL 17
+├── Dockerfile                     # マルチステージ Docker ビルド（node:22-slim）
+├── docs/                          # 設計ドキュメント
+│   └── gui-specifications.md      #   GUI 仕様書
 ├── eslint.config.mjs              # ESLint 設定（flat config）
-├── memo.md                        # 開発メモ／フェーズ管理
 ├── package.json                   # ルート package.json（workspaces 定義）
 ├── tsconfig.base.json             # 共通 TypeScript ベース設定
 ├── tsconfig.json                  # ルート tsconfig（プロジェクト参照）
@@ -208,46 +218,97 @@ mahjong-web/
     │           ├── ai.test.ts     #   8テスト（ユニット＋1局完走）
     │           └── simulation.test.ts # 5テスト（半荘・東風完走シミュレーション）
     │
-    ├── shared/                    # クライアント・サーバー共有型・ユーティリティ（未実装）
+    ├── shared/                    # クライアント・サーバー共有型・ユーティリティ
     │   ├── package.json
     │   ├── tsconfig.json
     │   └── src/
-    │       └── index.ts
+    │       ├── index.ts           # 再エクスポート
+    │       └── types.ts           # Socket.IO イベント型、ルーム・ゲーム共有型
     │
-    ├── client/                    # フロントエンド — React SPA（CPU対局UI実装済み）
+    ├── client/                    # フロントエンド — React SPA + Pixi.js 盤面描画
     │   ├── package.json
     │   ├── tsconfig.json
     │   └── src/
-    │       ├── index.ts
+    │       ├── main.tsx           # エントリーポイント
+    │       ├── App.tsx            # React Router ルート定義
+    │       ├── types.ts           # UI 用の型定義
+    │       ├── lib/
+    │       │   └── socket.ts      # Socket.IO クライアント（VITE_SERVER_URL で接続先制御）
     │       ├── stores/
-    │       │   └── gameStore.ts       # Zustand ゲームストア（CPU対局ループ）
+    │       │   ├── gameStore.ts       # Zustand — CPU対局ゲームループ
+    │       │   ├── onlineGameStore.ts # Zustand — 対人戦ゲームループ（Socket.IO連携）
+    │       │   └── onlineRoomStore.ts # Zustand — ルーム待機状態管理
     │       ├── utils/
-    │       │   └── viewConverter.ts   # domain → UI 表示データ変換
-    │       ├── types.ts               # UI 用の型定義
+    │       │   ├── viewConverter.ts       # domain → UI 表示データ変換（CPU戦）
+    │       │   └── onlineViewConverter.ts # domain → UI 表示データ変換（対人戦）
     │       ├── pages/
-    │       │   ├── HomePage.tsx        # トップページ
-    │       │   └── GamePage.tsx        # 対局画面
+    │       │   ├── TopPage.tsx            # トップページ（CPU戦／対人戦選択）
+    │       │   ├── RuleSettingsPage.tsx   # ルール設定画面
+    │       │   ├── GamePage.tsx           # CPU対局画面
+    │       │   ├── LobbyPage.tsx          # 対人戦ロビー（ルーム作成／参加）
+    │       │   ├── RoomPage.tsx           # ルーム待機画面
+    │       │   ├── OnlineGamePage.tsx     # 対人戦対局画面
+    │       │   └── ResultPage.tsx         # 対局結果画面
+    │       ├── pixi/                      # Pixi.js 盤面レンダリング
+    │       │   ├── layout.ts              #   レイアウト計算（動的 boardSize 対応）
+    │       │   ├── tiles/
+    │       │   │   ├── constants.ts       #     牌サイズ定数
+    │       │   │   ├── flatTile.ts        #     2D牌スプライト生成
+    │       │   │   └── tileAssets.ts      #     SVG 牌画像アセット管理
+    │       │   └── renderers/
+    │       │       ├── handRenderer.ts    #     手牌レンダラー
+    │       │       ├── discardRenderer.ts #     捨て牌レンダラー
+    │       │       └── meldRenderer.ts    #     副露レンダラー
     │       └── components/
     │           ├── tile/
     │           │   ├── TileView.tsx    # 牌コンポーネント（rotation prop で回転対応）
     │           │   ├── TileFace.tsx    # 牌の表面 SVG
-    │           │   └── TileBack.tsx    # 牌の裏面 SVG
+    │           │   ├── TileBack.tsx    # 牌の裏面 SVG
+    │           │   └── suits/         # 牌種別 SVG コンポーネント
     │           ├── board/
-    │           │   ├── GameBoard.tsx   # メイン盤面レイアウト（3×3 CSS Grid 捨て牌 + InfoPanel）
-    │           │   ├── PlayerHand.tsx  # 手牌表示（ツモ牌領域常時確保）
-    │           │   ├── DiscardArea.tsx # 捨て牌エリア（flow + tileRotation で4方向対応）
-    │           │   ├── MeldDisplay.tsx # 副露表示（鳴き元に応じた横倒し位置）
-    │           │   ├── InfoPanel.tsx   # 中央情報パネル（局・ドラ・得点）
-    │           │   └── DebugPanel.tsx  # デバッグパネル
+    │           │   ├── PixiGameBoard.tsx   # ★ メイン盤面（Pixi.js Canvas、動的サイズ）
+    │           │   ├── PixiInfoPanel.tsx   # Pixi.js 中央情報パネル
+    │           │   ├── GameBoard.tsx       # React 版盤面（フォールバック）
+    │           │   ├── PlayerHand.tsx      # 手牌表示
+    │           │   ├── DiscardArea.tsx     # 捨て牌エリア
+    │           │   ├── MeldDisplay.tsx     # 副露表示
+    │           │   └── InfoPanel.tsx       # React 版情報パネル
+    │           ├── action/
+    │           │   └── ActionButtons.tsx   # アクションボタン（ポン・チー・リーチ等）
+    │           ├── debug/
+    │           │   └── DebugPanel.tsx      # デバッグパネル
     │           └── overlay/
-    │               ├── RoundResultOverlay.tsx  # 局結果画面（役名日本語表示・ドラ数表示）
-    │               └── GameResultOverlay.tsx   # 最終結果画面
+    │               └── RoundResultOverlay.tsx  # 局結果画面（役名日本語表示・ドラ数表示）
     │
-    └── server/                    # バックエンド — API / WebSocket サーバー（未実装）
+    └── server/                    # バックエンド — Fastify + Socket.IO サーバー
         ├── package.json
         ├── tsconfig.json
+        ├── prisma.config.ts       # Prisma 設定（datasource URL）
+        ├── .env.example           # 環境変数テンプレート
+        ├── prisma/
+        │   ├── schema.prisma      # DB スキーマ（PostgreSQL、5モデル）
+        │   └── migrations/        # Prisma マイグレーション
         └── src/
-            └── index.ts
+            ├── index.ts           # サーバーエントリーポイント
+            ├── app.ts             # Fastify アプリケーション構成
+            ├── config.ts          # 環境変数から設定読み込み
+            ├── plugins/
+            │   ├── prisma.ts      #   Prisma クライアント（PrismaPg アダプター）
+            │   └── auth.ts        #   Firebase Authentication 検証
+            ├── routes/
+            │   ├── auth.ts        #   認証 API ルート
+            │   ├── rooms.ts       #   ルーム管理 API ルート
+            │   └── stats.ts       #   戦績 API ルート
+            ├── services/
+            │   ├── authService.ts  #   認証ビジネスロジック
+            │   ├── roomService.ts  #   ルーム CRUD
+            │   └── statsService.ts #   戦績集計
+            ├── game/
+            │   └── GameManager.ts  #   対局進行管理（サーバーサイド）
+            └── ws/
+                ├── index.ts        #   Socket.IO 初期化
+                ├── lobby.ts        #   ロビー WebSocket ハンドラー
+                └── game.ts         #   対局中 WebSocket ハンドラー
 ```
 
 ### モジュール依存関係（domain パッケージ内）
@@ -291,6 +352,13 @@ hand, action, round, rule, tile ← ai
 ### client パッケージの実装メモ
 
 以下は client パッケージ実装時に特筆すべき設計判断・注意点である。
+
+#### 盤面レンダリング（Pixi.js）
+- 盤面描画は **Pixi.js v8** を使用した 2D フラットレンダリングが主である。`PixiGameBoard.tsx` がメインの盤面コンポーネント。
+- `useBoardSize()` フックで `window.innerHeight` に追従する動的サイズを実現。Canvas サイズは正方形（`boardSize × boardSize`）。
+- `layout.ts` の `calculateBoardLayout(boardSize)` でレイアウトを計算。`totalCoeff = 10` で牌やパネルのサイズ比率を制御。
+- 牌画像は SVG ファイルを Pixi.js テクスチャとして読み込み、スプライトとして描画。
+- React 版の盤面コンポーネント（`GameBoard.tsx` 等）はフォールバックとして残存。
 
 #### 捨て牌の表示（DiscardArea）
 - 4方向の捨て牌は CSS `transform: rotate()` ではなく **flexbox の方向制御**（`flow` prop: right/left/up/down）で配置する。CSS rotation は親のレイアウトボックスに影響しないため `overflow: hidden` によるクリッピングが効かない。
@@ -476,35 +544,6 @@ export const useCreateTask = () => {
 - **ProtectedRoute コンポーネント**: 未認証時にログインページへリダイレクト
 - **useAuth フック**: 認証状態を簡単に取得
 
-## Google Calendar 連携
-
-### OAuth2 フロー
-
-1. **Google API Client Library**: `gapi` を使用
-2. **スコープ**: `https://www.googleapis.com/auth/calendar`
-3. **アクセストークン**: Firebase Auth の ID トークンとは別に管理
-
-### カレンダーイベント同期
-
-- **定期同期**: setInterval または Web Worker で定期的にポーリング
-- **キャッシュ**: React Query でイベントをキャッシュ
-- **オフライン対応**: IndexedDB に同期データを保存
-
-## 通知機能
-
-### Web Push API
-
-- **Service Worker**: `public/sw.js` で通知受信
-- **FCM**: Firebase Cloud Messaging でプッシュ通知配信
-- **通知許可**: 初回アクセス時に許可を要求
-- **通知クリック**: 特定のタスクやイベントページへ遷移
-
-### リマインダーのスケジューリング
-
-- **Web Worker**: バックグラウンドでタイマー実行
-- **Notification API**: ローカル通知を表示
-- **繰り返しタスク**: cron パターンを解析してスケジューリング
-
 ## テスト戦略
 
 ### 単体テスト (Vitest)
@@ -528,20 +567,31 @@ export const useCreateTask = () => {
 
 ### Vite ビルド設定
 
-- **環境変数**: `.env.development`, `.env.production` で管理
+- **環境変数**: `VITE_SERVER_URL` でバックエンド接続先を制御（ビルド時に埋め込み）
 - **コード分割**: 自動的に最適化されるが、必要に応じて手動設定
-- **アセット最適化**: 画像・フォントの最適化
+- **アセット最適化**: SVG 牌画像を含むアセットの最適化
 
-### Firebase Hosting
+### AWS デプロイ構成
 
-- **デプロイ**: `firebase deploy --only hosting`
-- **プレビュー**: `firebase hosting:channel:deploy preview`
-- **カスタムドメイン**: Firebase コンソールで設定
+| コンポーネント | AWS サービス | 備考 |
+|---|---|---|
+| フロントエンド | S3 + CloudFront | `mahjong.minatoproject.com`（独自ドメイン） |
+| バックエンド | App Runner | ECR から Docker イメージをデプロイ |
+| データベース | RDS PostgreSQL | t4g.micro |
+| コンテナレジストリ | ECR | `mahjong-web-server` リポジトリ |
+
+### デプロイ手順
+
+1. **Docker イメージビルド＆プッシュ**: `docker build --platform linux/amd64 -t mahjong-web-server .` → ECR へ push
+2. **App Runner 更新**: 新しいイメージで自動またはマニュアルデプロイ
+3. **フロントエンドビルド**: `VITE_SERVER_URL=https://<APP_RUNNER_URL> npm run build --workspace=packages/client`
+4. **S3 同期**: `aws s3 sync packages/client/dist/ s3://<BUCKET_NAME>/ --delete`
+5. **CloudFront 無効化**: `aws cloudfront create-invalidation --distribution-id <ID> --paths "/*"`
 
 ### CI/CD (GitHub Actions)
 
 - **PR チェック**: リント、型チェック、テスト実行
-- **自動デプロイ**: main ブランチへのマージで本番デプロイ
+- **自動デプロイ**: main ブランチへのマージで本番デプロイ（予定）
 
 ## コーディング規約・ベストプラクティス
 
