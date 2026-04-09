@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mahjong
+      POSTGRES_PASSWORD: mahjong
+      POSTGRES_DB: mahjong
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
