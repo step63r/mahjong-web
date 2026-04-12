@@ -126,6 +126,12 @@ function renderDiscardArea(
       dl.rowOffset.y * row +
       cumulativeExtra.y;
 
+    // 負方向 stride の横倒し牌は前の牌に重なるため、自身の位置も補正する
+    if (isRiichi) {
+      if (extra.dx < 0) sprite.x += extra.dx;
+      if (extra.dy < 0) sprite.y += extra.dy;
+    }
+
     container.addChild(sprite);
 
     // 横倒し牌の場合、後続牌の位置をずらす
