@@ -86,10 +86,17 @@ function renderMeldArea(
     : { x: 1, y: 0 };
 
   // 副露セット間のギャップ
-  const MELD_GAP = 20;
+  const MELD_GAP = 0;
 
   // stride 軸上の累積位置
   let cursor = { x: 0, y: 0 };
+
+  // 起家マーカー分のスペースを確保（盤面端に配置するため副露を内側にずらす）
+  if (isDealer && player.melds.length > 0) {
+    const markerSize = tileW;
+    cursor.x += strideAxis.x * markerSize;
+    cursor.y += strideAxis.y * markerSize;
+  }
 
   for (let mi = 0; mi < player.melds.length; mi++) {
     const meld = player.melds[mi];
@@ -149,15 +156,17 @@ function renderMeldArea(
     }
   }
 
-  // 起家表示マーカー
+  // 起家表示マーカー（盤面端に固定配置）
   if (isDealer) {
     const markerSize = tileW;
     const marker = createDealerMarker(markerSize, roundWind, dirIndex);
-    let mx = origin.x + cursor.x;
-    let my = origin.y + cursor.y;
+    let mx = origin.x;
+    let my = origin.y;
     // stride が負方向の場合、マーカーが canvas 外に出ないよう補正
     if (tileStride.y < 0) my -= markerSize;
     if (tileStride.x < 0) mx -= markerSize;
+    // 自家: origin.y は faceH 基準なのでマーカー（tileW）を下辺に揃える
+    if (direction === "self") my += faceH - markerSize;
     marker.x = mx;
     marker.y = my;
     container.addChild(marker);
