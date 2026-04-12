@@ -17,9 +17,9 @@ import {
 import {
   createSelfLyingTile, createSelfSidewaysTile,
   createSelfMeldTile, createSelfMeldCalledTile,
-  createShimochaLyingTile, createShimochaSidewaysTile,
-  createToimenLyingTile, createToimenSidewaysTile,
-  createKamichaLyingTile, createKamichaSidewaysTile,
+  createShimochaMeldTile, createShimochaMeldCalledTile,
+  createToimenMeldTile, createToimenMeldCalledTile,
+  createKamichaMeldTile, createKamichaMeldCalledTile,
 } from "../tiles/flatTile";
 
 // ===== 型 =====
@@ -33,9 +33,9 @@ interface MeldTileCreators {
 
 const CREATORS: Record<Direction, MeldTileCreators> = {
   self: { lying: createSelfMeldTile, sideways: createSelfMeldCalledTile },
-  shimocha: { lying: createShimochaLyingTile, sideways: createShimochaSidewaysTile },
-  toimen: { lying: createToimenLyingTile, sideways: createToimenSidewaysTile },
-  kamicha: { lying: createKamichaLyingTile, sideways: createKamichaSidewaysTile },
+  shimocha: { lying: createShimochaMeldTile, sideways: createShimochaMeldCalledTile },
+  toimen: { lying: createToimenMeldTile, sideways: createToimenMeldCalledTile },
+  kamicha: { lying: createKamichaMeldTile, sideways: createKamichaMeldCalledTile },
 };
 
 // ===== メイン =====
@@ -79,11 +79,13 @@ function renderMeldArea(
     ? { x: Math.sign(tileStride.x), y: 0 }
     : { x: 0, y: Math.sign(tileStride.y) };
 
-  // stride と直交する軸（横倒し牌の下揃え補正に使用）
-  // 自家: stride=x軸, cross=y軸(下揃え → +方向)
-  const crossAxis = strideAxis.x !== 0
-    ? { x: 0, y: 1 }
-    : { x: 1, y: 0 };
+  // stride と直交する軸（横倒し牌の盤面端揃え補正に使用）
+  // 自家: 下辺に揃える(+y), 下家: 右辺に揃える(+x)
+  // 対面/上家: origin が盤面端(0)なので補正不要(0)
+  const crossAxis: { x: number; y: number } =
+    direction === "self" ? { x: 0, y: 1 } :
+    direction === "shimocha" ? { x: 1, y: 0 } :
+    { x: 0, y: 0 };
 
   // 副露セット間のギャップ
   const MELD_GAP = 0;
@@ -109,11 +111,14 @@ function renderMeldArea(
     }
 
     // viewConverter は牌を視覚的な左→右順で配列する。
-    // stride が負方向（右→左 / 下→上）の場合、描画順を逆にして一致させる。
-    const reverseOrder = (strideAxis.x + strideAxis.y) < 0;
+    // stride の正負に関わらず、プレイヤー右端(origin)から左へ描画するため
+    // 配列の末尾(右端)を origin 側に配置する（reverseTileOrder=true）。
+    // cursor の pre/post increment は stride の正負で決定する。
+    const negativeStride = (strideAxis.x + strideAxis.y) < 0;
+    const reverseTileOrder = true;
 
     for (let rawIdx = 0; rawIdx < meld.tiles.length; rawIdx++) {
-      const ti = reverseOrder ? (meld.tiles.length - 1 - rawIdx) : rawIdx;
+      const ti = reverseTileOrder ? (meld.tiles.length - 1 - rawIdx) : rawIdx;
       const tile = meld.tiles[ti];
       const isCalled = ti === meld.calledTileIndex;
 
@@ -131,7 +136,7 @@ function renderMeldArea(
       const tileSize = isCalled ? faceH : tileW;
 
       // 負方向 stride: 先にカーソルを進めてから配置（異サイズ牌の隙間防止）
-      if (reverseOrder) {
+      if (negativeStride) {
         cursor.x += strideAxis.x * tileSize;
         cursor.y += strideAxis.y * tileSize;
       }
@@ -139,7 +144,7 @@ function renderMeldArea(
       sprite.x = origin.x + cursor.x;
       sprite.y = origin.y + cursor.y;
 
-      // 横倒し牌は高さが tileW (< faceH) なので、正位置牌の下端に揃える
+      // 横倒し牌は cross 軸方向のサイズが小さいため、盤面端に揃える
       if (isCalled) {
         const heightDiff = faceH - tileW;
         sprite.x += crossAxis.x * heightDiff;
@@ -149,7 +154,7 @@ function renderMeldArea(
       container.addChild(sprite);
 
       // 正方向 stride: 配置後にカーソルを進める
-      if (!reverseOrder) {
+      if (!negativeStride) {
         cursor.x += strideAxis.x * tileSize;
         cursor.y += strideAxis.y * tileSize;
       }
@@ -167,6 +172,10 @@ function renderMeldArea(
     if (tileStride.x < 0) mx -= markerSize;
     // 自家: origin.y は faceH 基準なのでマーカー（tileW）を下辺に揃える
     if (direction === "self") my += faceH - markerSize;
+    // 下家: lying牌がfaceH幅なのでマーカーを右辺に揃える
+    if (direction === "shimocha") mx += faceH - markerSize;
+    // 上家: lying牌がfaceH幅、マーカーは下辺かつ左辺に張り付く
+    if (direction === "kamicha") my -= markerSize;
     marker.x = mx;
     marker.y = my;
     container.addChild(marker);

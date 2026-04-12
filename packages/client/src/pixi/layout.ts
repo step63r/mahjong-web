@@ -182,7 +182,7 @@ function calculateShimochaLayout(
     },
     meld: {
       // 上端から下へ（下家の右=画面上）
-      origin: { x: boardSize - sideLyingW, y: 0 },
+      origin: { x: boardSize - faceH, y: 0 },
       tileStride: { x: 0, y: faceH },
     },
   };

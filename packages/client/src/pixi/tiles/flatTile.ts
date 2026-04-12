@@ -288,6 +288,44 @@ export function createShimochaSidewaysTile(
   return createShimochaLyingTile(tileType, isRedDora, faceW, true);
 }
 
+/**
+ * 下家の副露牌（捨て牌と同じ向き）: 表面 faceH × faceW（左90°回転）
+ * 暗槓の裏面牌にも対応（showFace=false で裏面表示）
+ */
+export function createShimochaMeldTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+  showFace = true,
+): Container {
+  const faceH = faceW * TILE_ASPECT_RATIO;
+  const container = new Container();
+  if (showFace) container.addChild(whiteBg(faceH, faceW));
+  const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
+  const scale = showFace ? SPRITE_SCALE : 1;
+  if (s) {
+    s.anchor.set(0.5, 0.5);
+    s.rotation = -Math.PI / 2;
+    s.width = faceW * scale;
+    s.height = faceH * scale;
+    s.x = faceH / 2;
+    s.y = faceW / 2;
+    container.addChild(s);
+  }
+  return container;
+}
+
+/**
+ * 下家の副露鳴き牌（捨て牌から左90°回転）: 表面 faceW × faceH（180°回転）
+ */
+export function createShimochaMeldCalledTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+): Container {
+  return createShimochaRiichiTile(tileType, isRedDora, faceW);
+}
+
 // ================================================================
 //  対面 (top) — 画面奥、180° 回転
 // ================================================================
@@ -394,6 +432,44 @@ export function createToimenSidewaysTile(
   faceW: number,
 ): Container {
   return createToimenLyingTile(tileType, isRedDora, faceW, true);
+}
+
+/**
+ * 対面の副露牌（捨て牌と同じ向き）: 表面 faceW × faceH（180°回転）
+ * 暗槓の裏面牌にも対応（showFace=false で裏面表示）
+ */
+export function createToimenMeldTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+  showFace = true,
+): Container {
+  const faceH = faceW * TILE_ASPECT_RATIO;
+  const container = new Container();
+  if (showFace) container.addChild(whiteBg(faceW, faceH));
+  const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
+  const scale = showFace ? SPRITE_SCALE : 1;
+  if (s) {
+    s.anchor.set(0.5, 0.5);
+    s.rotation = Math.PI;
+    s.width = faceW * scale;
+    s.height = faceH * scale;
+    s.x = faceW / 2;
+    s.y = faceH / 2;
+    container.addChild(s);
+  }
+  return container;
+}
+
+/**
+ * 対面の副露鳴き牌（捨て牌から左90°回転）: 表面 faceH × faceW（右90°回転）
+ */
+export function createToimenMeldCalledTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+): Container {
+  return createToimenRiichiTile(tileType, isRedDora, faceW);
 }
 
 // ================================================================
@@ -505,4 +581,42 @@ export function createKamichaSidewaysTile(
   faceW: number,
 ): Container {
   return createKamichaLyingTile(tileType, isRedDora, faceW, true);
+}
+
+/**
+ * 上家の副露牌（捨て牌と同じ向き）: 表面 faceH × faceW（右90°回転）
+ * 暗槓の裏面牌にも対応（showFace=false で裏面表示）
+ */
+export function createKamichaMeldTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+  showFace = true,
+): Container {
+  const faceH = faceW * TILE_ASPECT_RATIO;
+  const container = new Container();
+  if (showFace) container.addChild(whiteBg(faceH, faceW));
+  const s = showFace ? faceSprite(tileType, isRedDora) : backSprite();
+  const scale = showFace ? SPRITE_SCALE : 1;
+  if (s) {
+    s.anchor.set(0.5, 0.5);
+    s.rotation = Math.PI / 2;
+    s.width = faceW * scale;
+    s.height = faceH * scale;
+    s.x = faceH / 2;
+    s.y = faceW / 2;
+    container.addChild(s);
+  }
+  return container;
+}
+
+/**
+ * 上家の副露鳴き牌（捨て牌から左90°回転）: 表面 faceW × faceH（正位置）
+ */
+export function createKamichaMeldCalledTile(
+  tileType: string,
+  isRedDora: boolean,
+  faceW: number,
+): Container {
+  return createKamichaRiichiTile(tileType, isRedDora, faceW);
 }
