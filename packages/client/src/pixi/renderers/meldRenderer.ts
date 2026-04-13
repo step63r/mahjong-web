@@ -174,8 +174,6 @@ function renderMeldArea(
     if (direction === "self") my += faceH - markerSize;
     // 下家: lying牌がfaceH幅なのでマーカーを右辺に揃える
     if (direction === "shimocha") mx += faceH - markerSize;
-    // 上家: lying牌がfaceH幅、マーカーは下辺かつ左辺に張り付く
-    if (direction === "kamicha") my -= markerSize;
     marker.x = mx;
     marker.y = my;
     container.addChild(marker);
