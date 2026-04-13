@@ -32,6 +32,8 @@ export interface PixiGameBoardProps {
   initialDealerIndex?: number;
   selectedTileIndex?: number;
   onTileClick?: (index: number) => void;
+  /** リーチモード中の候補牌インデックス集合 */
+  riichiCandidateIndices?: ReadonlySet<number>;
   actionButtons?: React.ReactNode;
 }
 
@@ -198,7 +200,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
   useEffect(() => {
     if (!containers) return;
 
-    updateHands(containers.hands, layout, props.players, props.selectedTileIndex, props.onTileClick);
+    updateHands(containers.hands, layout, props.players, props.selectedTileIndex, props.onTileClick, props.riichiCandidateIndices);
     updateDiscards(containers.discards, layout, props.players);
     updateMelds(containers.melds, layout, props.players, props.initialDealerIndex, props.roundWind);
   }, [containers, layout, props]);

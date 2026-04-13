@@ -206,6 +206,22 @@ export function buildActionOptions(actions: PlayerAction[]): ActionOption[] {
   return options;
 }
 
+// ===== Riichi helpers =====
+
+/**
+ * リーチアクションの候補牌 type 一覧を返す。
+ * UI 側でリーチモード中に候補牌をハイライトするために使用。
+ */
+export function getRiichiCandidateTileTypes(actions: PlayerAction[]): Set<string> {
+  const types = new Set<string>();
+  for (const a of actions) {
+    if (a.type === ActionType.Riichi) {
+      types.add((a as { tile: Tile }).tile.type);
+    }
+  }
+  return types;
+}
+
 // ===== Round info helpers =====
 
 const WIND_LABELS: Record<string, string> = {

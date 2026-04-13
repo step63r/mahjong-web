@@ -6,6 +6,9 @@ interface ActionOption {
 interface ActionButtonsProps {
   actions: readonly ActionOption[];
   onAction: (type: string) => void;
+  /** リーチモード中は true — キャンセルボタンのみ表示 */
+  riichiMode?: boolean;
+  onCancelRiichi?: () => void;
 }
 
 const ACTION_STYLES: Record<string, string> = {
@@ -21,7 +24,21 @@ const ACTION_STYLES: Record<string, string> = {
   skip: "bg-gray-600 hover:bg-gray-500 text-white",
 };
 
-export function ActionButtons({ actions, onAction }: ActionButtonsProps) {
+export function ActionButtons({ actions, onAction, riichiMode, onCancelRiichi }: ActionButtonsProps) {
+  if (riichiMode) {
+    return (
+      <div className="flex gap-2 justify-center flex-wrap mt-2">
+        <span className="px-3 py-2 text-sm text-blue-200">捨てる牌を選択してください</span>
+        <button
+          onClick={onCancelRiichi}
+          className="px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-gray-600 hover:bg-gray-500 text-white"
+        >
+          キャンセル
+        </button>
+      </div>
+    );
+  }
+
   if (actions.length === 0) return null;
 
   return (

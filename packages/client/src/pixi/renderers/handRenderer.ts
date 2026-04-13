@@ -14,6 +14,8 @@ import {
 // ===== 選択状態の視覚フィードバック =====
 
 const SELECTED_LIFT_Y = -8;
+/** リーチモード中、候補外の牌の不透明度 */
+const DIMMED_ALPHA = 0.35;
 
 // ===== メイン =====
 
@@ -24,6 +26,8 @@ const SELECTED_LIFT_Y = -8;
  * @param layout 盤面レイアウト
  * @param players 4方向のプレイヤービュー
  * @param selectedTileIndex 自家の選択中の牌インデックス（undefined なら未選択）
+ * @param onTileClick 牌クリックコールバック
+ * @param riichiCandidateIndices リーチモード中の候補牌インデックス集合（undefined ならリーチモードでない）
  */
 export function updateHands(
   hands: [Container, Container, Container, Container],
@@ -31,8 +35,9 @@ export function updateHands(
   players: readonly PlayerViewState[],
   selectedTileIndex: number | undefined,
   onTileClick?: (index: number) => void,
+  riichiCandidateIndices?: ReadonlySet<number>,
 ): void {
-  renderSelfHand(hands[0], layout, players[0], selectedTileIndex, onTileClick);
+  renderSelfHand(hands[0], layout, players[0], selectedTileIndex, onTileClick, riichiCandidateIndices);
   renderOpponentHand(hands[1], layout, "shimocha", players[1]);
   renderOpponentHand(hands[2], layout, "toimen", players[2]);
   renderOpponentHand(hands[3], layout, "kamicha", players[3]);
@@ -46,6 +51,7 @@ function renderSelfHand(
   player: PlayerViewState | undefined,
   selectedTileIndex: number | undefined,
   onTileClick?: (index: number) => void,
+  riichiCandidateIndices?: ReadonlySet<number>,
 ): void {
   container.removeChildren();
   if (!player) return;
@@ -53,6 +59,7 @@ function renderSelfHand(
   const { tileW } = layout;
   const { origin, stride, tsumoGap } = layout.self.hand;
   const tiles = player.hand;
+  const isRiichiMode = riichiCandidateIndices !== undefined;
 
   // 通常手牌（13枚以下）
   for (let i = 0; i < tiles.length; i++) {
@@ -66,8 +73,15 @@ function renderSelfHand(
       sprite.y += SELECTED_LIFT_Y;
     }
 
+    // リーチモード: 候補外の牌を暗くする
+    if (isRiichiMode && !riichiCandidateIndices.has(i)) {
+      sprite.alpha = DIMMED_ALPHA;
+    }
+
     // クリックインタラクション
-    if (onTileClick) {
+    // リーチモード中は候補牌のみクリック可能
+    const clickable = onTileClick && (!isRiichiMode || riichiCandidateIndices.has(i));
+    if (clickable) {
       sprite.eventMode = "static";
       sprite.cursor = "pointer";
       const idx = i;
@@ -89,8 +103,14 @@ function renderSelfHand(
       sprite.y += SELECTED_LIFT_Y;
     }
 
+    // リーチモード: 候補外の牌を暗くする
+    if (isRiichiMode && !riichiCandidateIndices.has(tsumoIdx)) {
+      sprite.alpha = DIMMED_ALPHA;
+    }
+
     // クリックインタラクション
-    if (onTileClick) {
+    const clickable = onTileClick && (!isRiichiMode || riichiCandidateIndices.has(tsumoIdx));
+    if (clickable) {
       sprite.eventMode = "static";
       sprite.cursor = "pointer";
       sprite.on("pointertap", () => onTileClick(tsumoIdx));
