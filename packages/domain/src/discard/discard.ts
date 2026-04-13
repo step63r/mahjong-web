@@ -12,6 +12,8 @@ export interface DiscardEntry {
   readonly isRiichiDeclare: boolean;
   /** 他家に鳴かれたかどうか（鳴かれた場合は河に残らない） */
   calledBy: number | undefined;
+  /** この牌が捨てられた巡目（フリテン判定用） */
+  readonly turnIndex: number;
 }
 
 /**
@@ -25,12 +27,13 @@ export class Discard {
   /**
    * 捨て牌を追加する
    */
-  addDiscard(tile: Tile, isTsumogiri: boolean, isRiichiDeclare: boolean = false): void {
+  addDiscard(tile: Tile, isTsumogiri: boolean, isRiichiDeclare: boolean = false, turnIndex: number = 0): void {
     this.entries.push({
       tile,
       isTsumogiri,
       isRiichiDeclare,
       calledBy: undefined,
+      turnIndex,
     });
   }
 

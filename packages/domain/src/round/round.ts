@@ -289,7 +289,7 @@ function handleDiscard(
   const isRiichiDeclare = player.riichiTurnIndex === state.turnCount;
 
   // 河に追加
-  player.discard.addDiscard(tile, isTsumogiri, isRiichiDeclare);
+  player.discard.addDiscard(tile, isTsumogiri, isRiichiDeclare, state.turnCount);
 
   // 打牌後の状態
   state.lastDiscardTile = tile;
@@ -1144,13 +1144,17 @@ export function isFuriten(state: RoundState, playerIndex: number): boolean {
 
   // リーチ後フリテン: リーチ後に他家の捨て牌で和了牌をスルーした場合
   if (player.isRiichi) {
+    const riichiTurn = player.riichiTurnIndex;
+    // 現在判定対象の捨て牌（lastDiscardTile）は「スルーした牌」ではないため除外
+    const lastDiscard = state.lastDiscardTile;
     for (let i = 0; i < 4; i++) {
       if (i === playerIndex) continue;
       const otherDiscards = state.players[i].discard.getAllDiscards();
       for (const entry of otherDiscards) {
-        if (waitingTypes.includes(entry.tile.type)) {
-          // その牌がリーチ後に捨てられたかチェック（簡易判定: turnCountベース）
-          // 厳密な実装は巡目情報が必要だが、ここでは捨て牌の位置とリーチ巡目で判定
+        // リーチ宣言巡目より後に捨てられた牌のみチェック
+        if (entry.turnIndex > riichiTurn && waitingTypes.includes(entry.tile.type)) {
+          // 今捨てられた牌自体はまだスルーしていないので除外
+          if (lastDiscard && entry.tile.id === lastDiscard.id) continue;
           return true;
         }
       }
