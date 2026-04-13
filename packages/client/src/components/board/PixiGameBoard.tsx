@@ -98,8 +98,18 @@ function usePixiApp(
         }
 
         appRef.current = app;
-        containerRef.current?.appendChild(app.canvas as HTMLCanvasElement);
-        setReady(true);
+
+        // containerRef がまだ null の場合、DOM 準備完了まで待機
+        const attachCanvas = () => {
+          if (destroyed) return;
+          if (containerRef.current) {
+            containerRef.current.appendChild(app.canvas as HTMLCanvasElement);
+            setReady(true);
+          } else {
+            requestAnimationFrame(attachCanvas);
+          }
+        };
+        attachCanvas();
       });
 
     return () => {
@@ -184,11 +194,10 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     app.renderer.resize(boardSize, boardSize);
   }, [app, ready, boardSize]);
 
-  // --- 描画更新 (Step 5〜8 で各 update 関数を呼ぶ) ---
+  // --- 描画更新 ---
   useEffect(() => {
     if (!containers) return;
 
-    // TODO Step 5: updateHands(containers.hands, layout, props.players, props.selectedTileIndex)
     updateHands(containers.hands, layout, props.players, props.selectedTileIndex, props.onTileClick);
     updateDiscards(containers.discards, layout, props.players);
     updateMelds(containers.melds, layout, props.players, props.initialDealerIndex, props.roundWind);
