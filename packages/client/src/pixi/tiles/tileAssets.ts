@@ -91,13 +91,29 @@ async function loadTexture(key: string, url: string): Promise<Texture> {
   const inflight = loading.get(key);
   if (inflight) return inflight;
 
-  const promise = Assets.load<Texture>({
-    src: url,
-    data: { resolution: 2 },
-  }).then((tex) => {
-    cache.set(key, tex);
-    loading.delete(key);
-    return tex;
+  const dpr = window.devicePixelRatio ?? 1;
+  const w = Math.round(80 * dpr);
+  const h = Math.round(w * (4 / 3));
+
+  const promise = new Promise<Texture>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        const tex = Texture.from({ resource: canvas, scaleMode: "linear" });
+        cache.set(key, tex);
+        loading.delete(key);
+        resolve(tex);
+      } catch (e) {
+        reject(e as Error);
+      }
+    };
+    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+    img.src = url;
   });
 
   loading.set(key, promise);
