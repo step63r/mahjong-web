@@ -6,14 +6,16 @@ import { RoundResultOverlay } from "@/components/overlay/RoundResultOverlay";
 import { DebugPanel } from "@/components/debug/DebugPanel";
 import { useGameStore } from "@/stores/gameStore";
 import { buildPlayerViews, buildActionOptions, getRiichiCandidateTileTypes, computeWaitingTiles } from "@/utils/viewConverter";
-import { ActionType, RoundEndReason } from "@mahjong-web/domain";
+import { ActionType, RoundEndReason, createDefaultRuleConfig } from "@mahjong-web/domain";
+import type { RuleConfig } from "@mahjong-web/domain";
 import type { TileData } from "@/types";
 import type { WaitingTileInfo } from "@/utils/viewConverter";
 
 export function GamePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const gameLength = (location.state as { gameLength?: string } | null)?.gameLength ?? "hanchan";
+  const ruleConfig = (location.state as { ruleConfig?: RuleConfig } | null)?.ruleConfig
+    ?? createDefaultRuleConfig();
 
   const {
     uiPhase,
@@ -39,9 +41,10 @@ export function GamePage() {
   // ゲーム開始
   useEffect(() => {
     if (uiPhase === "idle") {
-      startCpuGame(gameLength as "tonpu" | "hanchan");
+      startCpuGame(ruleConfig);
     }
-  }, [uiPhase, gameLength, startCpuGame]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uiPhase, startCpuGame]);
 
   // ゲーム終了 → リザルト画面へ遷移
   useEffect(() => {

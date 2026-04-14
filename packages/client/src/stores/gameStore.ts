@@ -27,8 +27,6 @@ import {
   GamePhase,
   ActionType,
   BasicAiPlayer,
-  createDefaultRuleConfig,
-  createTonpuDefaults,
 } from "@mahjong-web/domain";
 
 // ===== UI phases =====
@@ -59,7 +57,7 @@ export interface GameStore {
   debugTargetPlayer: number;
 
   // actions
-  startCpuGame: (gameLength: "tonpu" | "hanchan") => void;
+  startCpuGame: (ruleConfig: RuleConfig) => void;
   selectTile: (index: number | undefined) => void;
   performAction: (action: PlayerAction) => void;
   nextRound: () => void;
@@ -148,12 +146,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   debugSelectedHandTileKey: undefined,
   debugTargetPlayer: 0,
 
-  startCpuGame: (gameLength) => {
+  startCpuGame: (ruleConfig) => {
     // Strict Mode の二重実行によるゲームループ重複を防止
     if (get().uiPhase !== "idle") return;
-
-    const ruleConfig: RuleConfig =
-      gameLength === "tonpu" ? createTonpuDefaults() : createDefaultRuleConfig();
 
     const game = startGame(createGame(ruleConfig));
     const info = getCurrentRoundInfo(game);
