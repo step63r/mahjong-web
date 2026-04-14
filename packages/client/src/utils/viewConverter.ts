@@ -2,7 +2,7 @@
  * ドメインの RoundState / GameState から UI 表示用データに変換するユーティリティ
  */
 import type { RoundState, Tile, Meld, PlayerAction, GameState } from "@mahjong-web/domain";
-import { ActionType, sortTiles } from "@mahjong-web/domain";
+import { ActionType, sortTiles, getTenpaiTiles } from "@mahjong-web/domain";
 import type { TileData, DiscardEntryData, MeldViewData, PlayerViewState } from "@/types";
 
 // ===== Tile conversion =====
@@ -220,6 +220,70 @@ export function getRiichiCandidateTileTypes(actions: PlayerAction[]): Set<string
     }
   }
   return types;
+}
+
+// ===== Riichi waiting tile info =====
+
+export interface WaitingTileInfo {
+  type: string;
+  remaining: number;
+}
+
+/**
+ * リーチ候補牌を捨てた場合の待ち牌リストと推定残り枚数を計算する。
+ *
+ * 推定残り枚数 = 4 - (自分の手牌 + 全河 + ドラ表示牌 + 全副露に見える枚数)
+ */
+export function computeWaitingTiles(
+  round: RoundState,
+  discardTileType: string,
+): WaitingTileInfo[] {
+  const player = round.players[0];
+  const handTiles = player.hand.getTiles();
+
+  // 捨てる牌を1枚除いた手牌で聴牌判定
+  let removed = false;
+  const remaining = handTiles.filter((t) => {
+    if (!removed && t.type === discardTileType) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
+  const closedTypes = remaining.map((t) => t.type);
+  const waitTypes = getTenpaiTiles(closedTypes, player.melds);
+  if (waitTypes.length === 0) return [];
+
+  // 可視牌のtype別カウント
+  const visibleCount = new Map<string, number>();
+  const inc = (type: string) => visibleCount.set(type, (visibleCount.get(type) ?? 0) + 1);
+
+  // 自分の手牌（捨てる牌を除いた残り）
+  for (const t of remaining) inc(t.type);
+
+  // 全プレイヤーの河
+  for (const p of round.players) {
+    for (const entry of p.discard.getAllDiscards()) {
+      inc(entry.tile.type);
+    }
+  }
+
+  // ドラ表示牌
+  for (const t of round.wall.getDoraIndicators()) {
+    inc(t.type);
+  }
+
+  // 全プレイヤーの副露
+  for (const p of round.players) {
+    for (const meld of p.melds) {
+      for (const t of meld.tiles) inc(t.type);
+    }
+  }
+
+  return waitTypes.map((type) => ({
+    type,
+    remaining: 4 - (visibleCount.get(type) ?? 0),
+  }));
 }
 
 // ===== Round info helpers =====

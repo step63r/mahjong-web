@@ -14,6 +14,8 @@ import { updateDiscards } from "../../pixi/renderers/discardRenderer";
 import { updateMelds } from "../../pixi/renderers/meldRenderer";
 import { PixiInfoPanel } from "./PixiInfoPanel";
 import type { PlayerViewState, TileData, DiscardEntryData, MeldViewData } from "../../types";
+import type { WaitingTileInfo } from "../../utils/viewConverter";
+import { RiichiWaitTooltip } from "../action/RiichiWaitTooltip";
 
 // ===== Props =====
 
@@ -31,6 +33,10 @@ export interface PixiGameBoardProps {
   /** 起家のインデックス（ゲーム通して固定） */
   initialDealerIndex?: number;
   selectedTileIndex?: number;
+  /** リーチモードで選択中の手牌インデックス */
+  riichiSelectedIndex?: number;
+  /** リーチモードで選択中の牌の待ち牌情報 */
+  riichiWaitingTiles?: readonly WaitingTileInfo[];
   onTileClick?: (index: number) => void;
   /** リーチモード中の候補牌インデックス集合 */
   riichiCandidateIndices?: ReadonlySet<number>;
@@ -200,10 +206,25 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
   useEffect(() => {
     if (!containers) return;
 
-    updateHands(containers.hands, layout, props.players, props.selectedTileIndex, props.onTileClick, props.riichiCandidateIndices);
+    // リーチモード中は riichiSelectedIndex を選択表示として使用
+    const activeSelectedIndex = props.riichiSelectedIndex ?? props.selectedTileIndex;
+    updateHands(containers.hands, layout, props.players, activeSelectedIndex, props.onTileClick, props.riichiCandidateIndices);
     updateDiscards(containers.discards, layout, props.players);
     updateMelds(containers.melds, layout, props.players, props.initialDealerIndex, props.roundWind);
   }, [containers, layout, props]);
+
+  // --- リーチツールチップの位置計算 ---
+  const tooltipPosition = useMemo(() => {
+    if (props.riichiSelectedIndex === undefined || !props.riichiWaitingTiles?.length) return null;
+    const idx = props.riichiSelectedIndex;
+    const hand = layout.self.hand;
+    const handLen = props.players[0]?.hand.length ?? 0;
+    const isTsumo = idx === handLen;
+
+    const tileX = hand.origin.x + hand.stride.x * idx + (isTsumo ? hand.tsumoGap.x : 0);
+    const tileY = hand.origin.y;
+    return { centerX: tileX + layout.tileW / 2, bottomY: tileY - 4 };
+  }, [props.riichiSelectedIndex, props.riichiWaitingTiles, layout, props.players]);
 
   return (
     <div className="flex flex-col h-screen bg-[#1a1a2e] select-none overflow-hidden">
@@ -225,6 +246,14 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
               scores={props.players.map((p) => p.score)}
               currentPlayer={props.currentPlayer}
               dealerIndex={props.dealerIndex}
+            />
+          )}
+          {/* リーチ待ち牌ツールチップ */}
+          {tooltipPosition && props.riichiWaitingTiles && (
+            <RiichiWaitTooltip
+              waitingTiles={props.riichiWaitingTiles}
+              centerX={tooltipPosition.centerX}
+              bottomY={tooltipPosition.bottomY}
             />
           )}
         </div>

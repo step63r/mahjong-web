@@ -5,9 +5,10 @@ import { ActionButtons } from "@/components/action/ActionButtons";
 import { RoundResultOverlay } from "@/components/overlay/RoundResultOverlay";
 import { DebugPanel } from "@/components/debug/DebugPanel";
 import { useGameStore } from "@/stores/gameStore";
-import { buildPlayerViews, buildActionOptions, getRiichiCandidateTileTypes } from "@/utils/viewConverter";
+import { buildPlayerViews, buildActionOptions, getRiichiCandidateTileTypes, computeWaitingTiles } from "@/utils/viewConverter";
 import { ActionType } from "@mahjong-web/domain";
 import type { TileData } from "@/types";
+import type { WaitingTileInfo } from "@/utils/viewConverter";
 
 export function GamePage() {
   const location = useLocation();
@@ -51,6 +52,8 @@ export function GamePage() {
 
   // === リーチモード ===
   const [riichiMode, setRiichiMode] = useState(false);
+  /** リーチモードで選択中の手牌インデックス */
+  const [riichiSelectedIndex, setRiichiSelectedIndex] = useState<number | undefined>(undefined);
 
   // リーチモード中の候補牌の手牌インデックス集合
   const riichiCandidateIndices = useMemo(() => {
@@ -69,29 +72,48 @@ export function GamePage() {
     return indices;
   }, [riichiMode, roundState, availableActions, debugMode]);
 
+  // リーチモードで選択中の牌の待ち牌情報
+  const riichiWaitingTiles: WaitingTileInfo[] | undefined = useMemo(() => {
+    if (!riichiMode || riichiSelectedIndex === undefined || !roundState) return undefined;
+    const views = buildPlayerViews(roundState, 0, debugMode);
+    const selfView = views[0];
+    const tile =
+      riichiSelectedIndex === selfView.hand.length ? selfView.drawnTile : selfView.hand[riichiSelectedIndex];
+    if (!tile) return undefined;
+    return computeWaitingTiles(roundState, tile.type);
+  }, [riichiMode, riichiSelectedIndex, roundState, debugMode]);
+
   // フェーズが変わったらリーチモードを解除
   useEffect(() => {
     setRiichiMode(false);
+    setRiichiSelectedIndex(undefined);
   }, [uiPhase]);
 
   const handleTileClick = useCallback(
     (index: number) => {
       if (uiPhase !== "waitingHumanDraw") return;
 
-      // リーチモード中: 候補牌をクリックしたらリーチアクション実行
+      // リーチモード中: 1回目は選択、同じ牌を2回目でリーチ確定
       if (riichiMode && roundState) {
-        const views = buildPlayerViews(roundState, 0, debugMode);
-        const selfView = views[0];
-        const sortedTile =
-          index === selfView.hand.length ? selfView.drawnTile : selfView.hand[index];
-        if (sortedTile) {
-          const match = availableActions.find(
-            (a) => a.type === ActionType.Riichi && a.tile.type === sortedTile.type,
-          );
-          if (match) {
-            setRiichiMode(false);
-            performAction(match);
+        if (riichiSelectedIndex === index) {
+          // 確定: リーチアクション実行
+          const views = buildPlayerViews(roundState, 0, debugMode);
+          const selfView = views[0];
+          const sortedTile =
+            index === selfView.hand.length ? selfView.drawnTile : selfView.hand[index];
+          if (sortedTile) {
+            const match = availableActions.find(
+              (a) => a.type === ActionType.Riichi && a.tile.type === sortedTile.type,
+            );
+            if (match) {
+              setRiichiMode(false);
+              setRiichiSelectedIndex(undefined);
+              performAction(match);
+            }
           }
+        } else {
+          // 選択（候補牌のみ — handRenderer でクリック制限済み）
+          setRiichiSelectedIndex(index);
         }
         return;
       }
@@ -121,6 +143,7 @@ export function GamePage() {
     [
       uiPhase,
       riichiMode,
+      riichiSelectedIndex,
       selectedTileIndex,
       availableActions,
       roundState,
@@ -136,15 +159,11 @@ export function GamePage() {
         performAction({ type: ActionType.Skip, playerIndex: 0 });
         return;
       }
-      // リーチボタン: リーチモードに入る（候補が1つなら即実行）
+      // リーチボタン: リーチモードに入る（待ち牌確認のため常に選択ステップを経由）
       if (type === ActionType.Riichi) {
-        const riichiActions = availableActions.filter((a) => a.type === ActionType.Riichi);
-        if (riichiActions.length === 1) {
-          performAction(riichiActions[0]);
-        } else {
-          setRiichiMode(true);
-          selectTile(undefined);
-        }
+        setRiichiMode(true);
+        setRiichiSelectedIndex(undefined);
+        selectTile(undefined);
         return;
       }
       const match = availableActions.find((a) => a.type === type);
@@ -157,6 +176,7 @@ export function GamePage() {
 
   const handleCancelRiichi = useCallback(() => {
     setRiichiMode(false);
+    setRiichiSelectedIndex(undefined);
   }, []);
 
   // ロード中
@@ -192,6 +212,8 @@ export function GamePage() {
         dealerIndex={roundState.dealerIndex}
         initialDealerIndex={gameState.initialDealerIndex}
         selectedTileIndex={isWaiting && !riichiMode ? selectedTileIndex : undefined}
+        riichiSelectedIndex={isWaiting && riichiMode ? riichiSelectedIndex : undefined}
+        riichiWaitingTiles={isWaiting && riichiMode ? riichiWaitingTiles : undefined}
         onTileClick={isWaiting ? handleTileClick : undefined}
         riichiCandidateIndices={isWaiting ? riichiCandidateIndices : undefined}
         actionButtons={
