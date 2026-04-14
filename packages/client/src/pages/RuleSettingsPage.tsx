@@ -110,10 +110,10 @@ export function RuleSettingsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-emerald-900 flex flex-col items-center py-8 px-4">
-      <h2 className="text-3xl font-bold text-white mb-6">ルール設定</h2>
+    <div className="h-screen bg-emerald-900 flex flex-col items-center py-6 px-4">
+      <h2 className="text-3xl font-bold text-white mb-4 shrink-0">ルール設定</h2>
 
-      <div className="bg-emerald-800 rounded-xl p-5 w-full max-w-md space-y-5 overflow-y-auto max-h-[calc(100vh-160px)]">
+      <div className="bg-emerald-800 rounded-xl p-5 w-full max-w-md space-y-5 overflow-y-auto min-h-0 flex-1">
         {/* 対局の長さ */}
         <div>
           <SectionHeader title="対局の長さ" />
@@ -341,7 +341,7 @@ export function RuleSettingsPage() {
       </div>
 
       {/* ボタン */}
-      <div className="flex gap-4 mt-6">
+      <div className="flex gap-4 mt-4 shrink-0">
         <button
           onClick={() => navigate("/")}
           className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-xl transition-colors"
