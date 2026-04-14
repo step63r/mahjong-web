@@ -9,6 +9,9 @@ import {
   createShimochaStandingTile,
   createToimenStandingTile,
   createKamichaStandingTile,
+  createShimochaDiscardTile,
+  createToimenDiscardTile,
+  createKamichaDiscardTile,
 } from "../tiles/flatTile";
 
 // ===== 選択状態の視覚フィードバック =====
@@ -130,6 +133,13 @@ const STANDING_CREATORS: Record<OpponentDirection, (faceW: number) => Container>
   kamicha: createKamichaStandingTile,
 };
 
+/** 表向き（公開）手牌を捨て牌と同じ向きで描画する関数マップ */
+const FACE_UP_CREATORS: Record<OpponentDirection, (tileType: string, isRedDora: boolean, faceW: number) => Container> = {
+  shimocha: createShimochaDiscardTile,
+  toimen: createToimenDiscardTile,
+  kamicha: createKamichaDiscardTile,
+};
+
 function renderOpponentHand(
   container: Container,
   layout: BoardLayout,
@@ -142,10 +152,15 @@ function renderOpponentHand(
   const { tileW } = layout;
   const { origin, stride } = layout[direction].hand;
   const tileCount = player.hand.length;
-  const createTile = STANDING_CREATORS[direction];
+  const createBack = STANDING_CREATORS[direction];
+  const createFace = FACE_UP_CREATORS[direction];
 
   for (let i = 0; i < tileCount; i++) {
-    const sprite = createTile(tileW);
+    const tile = player.hand[i];
+    const isFaceUp = tile.type !== "back";
+    const sprite = isFaceUp
+      ? createFace(tile.type, tile.isRedDora, tileW)
+      : createBack(tileW);
     sprite.x = origin.x + stride.x * i;
     sprite.y = origin.y + stride.y * i;
     container.addChild(sprite);

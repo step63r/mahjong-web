@@ -76,14 +76,16 @@ function toMeldView(meld: Meld, playerIndex: number): MeldViewData {
  * 局の状態からプレイヤー表示用データを生成する。
  * humanIndex のプレイヤーは手牌を公開し、それ以外は伏せ牌にする。
  * debugMode が true の場合は全員の手牌を公開する。
+ * revealedPlayerIndices が指定された場合、該当プレイヤーの手牌も公開する。
  */
 export function buildPlayerViews(
   round: RoundState,
   humanIndex: number,
   debugMode: boolean,
+  revealedPlayerIndices?: ReadonlySet<number>,
 ): PlayerViewState[] {
   return round.players.map((player, i) => {
-    const showHand = i === humanIndex || debugMode;
+    const showHand = i === humanIndex || debugMode || (revealedPlayerIndices?.has(i) ?? false);
     const handTiles = player.hand.getTiles();
 
     // 手牌: ツモ牌は最後の1枚を分離して drawnTile にする（14枚の場合）

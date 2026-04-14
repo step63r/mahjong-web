@@ -6,7 +6,7 @@ import { RoundResultOverlay } from "@/components/overlay/RoundResultOverlay";
 import { DebugPanel } from "@/components/debug/DebugPanel";
 import { useGameStore } from "@/stores/gameStore";
 import { buildPlayerViews, buildActionOptions, getRiichiCandidateTileTypes, computeWaitingTiles } from "@/utils/viewConverter";
-import { ActionType } from "@mahjong-web/domain";
+import { ActionType, RoundEndReason } from "@mahjong-web/domain";
 import type { TileData } from "@/types";
 import type { WaitingTileInfo } from "@/utils/viewConverter";
 
@@ -179,6 +179,23 @@ export function GamePage() {
     setRiichiSelectedIndex(undefined);
   }, []);
 
+  // 局結果表示時に手牌を公開するプレイヤー
+  const revealedPlayers = useMemo(() => {
+    if (uiPhase !== "roundResult" || !roundState?.result) return undefined;
+    const result = roundState.result;
+    const indices = new Set<number>();
+    if (result.reason === RoundEndReason.Win) {
+      for (const win of result.wins) {
+        indices.add(win.winnerIndex);
+      }
+    } else if (result.reason === RoundEndReason.ExhaustiveDraw) {
+      result.tenpaiPlayers.forEach((isTenpai, i) => {
+        if (isTenpai) indices.add(i);
+      });
+    }
+    return indices.size > 0 ? indices : undefined;
+  }, [uiPhase, roundState?.result]);
+
   // ロード中
   if (!roundState || !gameState) {
     return (
@@ -188,7 +205,7 @@ export function GamePage() {
     );
   }
 
-  const playerViews = buildPlayerViews(roundState, 0, debugMode);
+  const playerViews = buildPlayerViews(roundState, 0, debugMode, revealedPlayers);
   const actionOptions = buildActionOptions(availableActions);
   const doraIndicators: TileData[] = roundState.wall.getDoraIndicators().map((t) => ({
     type: t.type,
