@@ -5,3 +5,4 @@ export type { YakuResult, JudgeResult, ParsedGroup, ParsedHand, WinContext } fro
 
 export { parseMentsu, parseChiitoitsu, parseKokushi } from "./parser.js";
 export { judgeWin } from "./judge.js";
+export { checkAtozukeAllowed } from "./atozuke.js";

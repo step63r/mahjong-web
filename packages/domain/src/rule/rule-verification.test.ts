@@ -30,6 +30,7 @@ import { createGame, startGame, processRoundResult, calculateFinalResult, GamePh
 import type { WinContext, JudgeResult, ParsedHand } from "../yaku/types.js";
 import { Yaku, GroupType } from "../yaku/types.js";
 import { judgeWin } from "../yaku/judge.js";
+import { checkAtozukeAllowed } from "../yaku/atozuke.js";
 import { calculateScore, calculateFu, calculateChiitoitsuFu } from "../score/index.js";
 import type { ScoreContext } from "../score/index.js";
 
@@ -1868,5 +1869,363 @@ describe("rounding（端数計算）", () => {
     const gameUp = makeFinishedGame(rule, [41100, 25900, 22000, 11000]);
     const resultUp = calculateFinalResult(gameUp);
     expect(resultUp.finalPoints[1]).toBe(6); // 5.9 → 6
+  });
+});
+
+// =====================================================
+// カテゴリ7: 後付け（atozuke）
+//
+// copilot-instructions.md の全例を網羅
+// =====================================================
+
+/** チー副露を作成するヘルパー */
+function makeChiMeld(tileTypes: [TileType, TileType, TileType], fromPlayer: number): Meld {
+  return {
+    type: MeldType.Chi,
+    tiles: [tile(tileTypes[0], 0), tile(tileTypes[1], 1), tile(tileTypes[2], 2)],
+    calledTile: tile(tileTypes[0], 0),
+    fromPlayerIndex: fromPlayer,
+  };
+}
+
+/** 後付けナシルール */
+const atozukeNashiRule = withRule(defaultRule, { atozuke: false });
+
+/** judgeWin を呼んで checkAtozukeAllowed の結果を返すヘルパー */
+function isAtozukeAllowed(ctx: WinContext): boolean {
+  const result = judgeWin(ctx);
+  if (!result) return false; // 役なし
+  return checkAtozukeAllowed(ctx, result);
+}
+
+// ===== ① 第一副露チェック =====
+
+describe("atozuke（後付け）— ① 第一副露チェック", () => {
+  it("アガれない例1: 第一副露が役に絡まず、役は第二副露の中のみ", () => {
+    // 手牌: 23456s西西, 第一副露: 123p, 第二副露: 中中中, ロン: 1s/4s/7s
+    const melds: Meld[] = [
+      makeChiMeld([TT.Pin1, TT.Pin2, TT.Pin3], 3),  // 第一副露
+      makePonMeld(TT.Chun, 1),                         // 第二副露
+    ];
+    // ロン牌 1s → 123456s + 西西 + 123p + 中中中
+    const ctx = makeCtx({
+      // 手牌14枚: 閉じた手牌 = ロン牌含む
+      handTiles: tiles(TT.Sou1, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5, TT.Sou6, TT.Sha, TT.Sha),
+      melds,
+      winTile: tile(TT.Sou1),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(false);
+  });
+
+  it("アガれない例2: 第一副露が役に絡まず、三色も手牌で完成していない", () => {
+    // 手牌: 234s234m西, 第一副露: 123p, 第二副露: 234p, ロン: 西
+    const melds: Meld[] = [
+      makeChiMeld([TT.Pin1, TT.Pin2, TT.Pin3], 3),  // 第一副露
+      makeChiMeld([TT.Pin2, TT.Pin3, TT.Pin4], 3),  // 第二副露
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(TT.Sou2, TT.Sou3, TT.Sou4, TT.Man2, TT.Man3, TT.Man4, TT.Sha, TT.Sha),
+      melds,
+      winTile: tile(TT.Sha),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(false);
+  });
+
+  it("アガれる例1: 第一副露が役に絡まないが、手牌で一気通貫が確定", () => {
+    // 手牌: 123456789s西西, 第一副露: 123p, ロン: 西
+    const melds: Meld[] = [
+      makeChiMeld([TT.Pin1, TT.Pin2, TT.Pin3], 3),
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Sou4, TT.Sou5, TT.Sou6,
+        TT.Sou7, TT.Sou8, TT.Sou9,
+        TT.Sha, TT.Sha,
+      ),
+      melds,
+      winTile: tile(TT.Sha),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("アガれる例2: 第一副露が役に絡まないが、白の暗刻で役が確定", () => {
+    // 手牌: 123456s4m4m白白白, 第一副露: 123p, ロン: 4m
+    const melds: Meld[] = [
+      makeChiMeld([TT.Pin1, TT.Pin2, TT.Pin3], 3),
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Sou4, TT.Sou5, TT.Sou6,
+        TT.Man4, TT.Man4,
+        TT.Haku, TT.Haku, TT.Haku,
+      ),
+      melds,
+      winTile: tile(TT.Man4),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("アガれる例3: 第一副露が一気通貫に絡み、待ちも1種で確定", () => {
+    // 手牌: 12389s444m西西, 第一副露: 456s, ロン: 7s
+    const melds: Meld[] = [
+      makeChiMeld([TT.Sou4, TT.Sou5, TT.Sou6], 3),
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Sou7, TT.Sou8, TT.Sou9,
+        TT.Man4, TT.Man4, TT.Man4,
+        TT.Sha, TT.Sha,
+      ),
+      melds,
+      winTile: tile(TT.Sou7),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("後付けアリではすべてのケースでアガれる", () => {
+    // アガれない例1 と同じ手牌だが atozuke=true
+    const melds: Meld[] = [
+      makeChiMeld([TT.Pin1, TT.Pin2, TT.Pin3], 3),
+      makePonMeld(TT.Chun, 1),
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(TT.Sou1, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5, TT.Sou6, TT.Sha, TT.Sha),
+      melds,
+      winTile: tile(TT.Sou1),
+      ruleConfig: withRule(defaultRule, { atozuke: true }),
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+});
+
+// ===== ② 片和了りチェック =====
+
+describe("atozuke（後付け）— ② 片和了り禁止", () => {
+  it("アガれない例1: 白が来たときのみ役 → 片和了り", () => {
+    // 手牌: 123s33567m666p白白, ロン: 3m or 白
+    // 3m → 役なし、白 → 白のみ → 片和了り → アガれない
+    const winTileHaku = tile(TT.Haku);
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Man3, TT.Man3, TT.Man5, TT.Man6, TT.Man7,
+        TT.Pin6, TT.Pin6, TT.Pin6,
+        TT.Haku, TT.Haku,
+        TT.Haku,
+      ),
+      melds: [],
+      winTile: winTileHaku,
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(false);
+  });
+
+  it("アガれない例2: 9s来れば一気通貫だが3s/6sでは役なし → 片和了り", () => {
+    // 手牌: 12345678s456m白白, ロン: 3s/6s/9s
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5, TT.Sou6, TT.Sou7, TT.Sou8,
+        TT.Man4, TT.Man5, TT.Man6,
+        TT.Haku, TT.Haku,
+        TT.Sou9,
+      ),
+      melds: [],
+      winTile: tile(TT.Sou9),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(false);
+  });
+
+  it("アガれない例3: 白 or 中のシャンポンでどちらの役か不定 → 片和了り", () => {
+    // 手牌: 123456s456m白白中中, ロン: 白 or 中
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Sou4, TT.Sou5, TT.Sou6,
+        TT.Man4, TT.Man5, TT.Man6,
+        TT.Haku, TT.Haku,
+        TT.Chun, TT.Chun,
+        TT.Haku,
+      ),
+      melds: [],
+      winTile: tile(TT.Haku),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(false);
+  });
+
+  it("アガれない例4: 1s/3s/4sで役が異なる → 片和了り", () => {
+    // 手牌: 2223s45678m234p, ロン: 1s/3s/4s
+    // 1s → ピンフのみ, 3s → タンヤオのみ, 4s → ピンフ+タンヤオ
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou2, TT.Sou2, TT.Sou2, TT.Sou3,
+        TT.Man4, TT.Man5, TT.Man6, TT.Man7, TT.Man8,
+        TT.Pin2, TT.Pin3, TT.Pin4,
+        TT.Sou1,
+        TT.Sou1, // ダミー — 下で修正
+      ),
+      melds: [],
+      winTile: tile(TT.Sou1),
+      ruleConfig: atozukeNashiRule,
+    });
+    // 正しい手牌: 2223s45678m234p + ロン1s = 14枚
+    const correctCtx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou2, TT.Sou2, TT.Sou3,
+        TT.Man4, TT.Man5, TT.Man6, TT.Man7, TT.Man8,
+        TT.Pin2, TT.Pin3, TT.Pin4,
+      ),
+      melds: [],
+      winTile: tile(TT.Sou1),
+      ruleConfig: atozukeNashiRule,
+      seatWind: TT.Sha, // 非親
+    });
+    expect(isAtozukeAllowed(correctCtx)).toBe(false);
+  });
+
+  it("アガれる例1: 西 or 白どちらでもチャンタ確定 → OK", () => {
+    // 手牌: 123s123m789p西西白白, ロン: 西 or 白
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Man1, TT.Man2, TT.Man3,
+        TT.Pin7, TT.Pin8, TT.Pin9,
+        TT.Sha, TT.Sha,
+        TT.Haku, TT.Haku,
+        TT.Sha,
+      ),
+      melds: [],
+      winTile: tile(TT.Sha),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("アガれる例2: 3s/6sどちらでもタンヤオ確定 → OK", () => {
+    // 手牌: 334455s234m33388p, ロン: 3s or 6s
+    // 3s → イーペーコー+タンヤオ, 6s → タンヤオ → 共通: タンヤオ → OK
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou3, TT.Sou4, TT.Sou4, TT.Sou5, TT.Sou5,
+        TT.Man2, TT.Man3, TT.Man4,
+        TT.Pin3, TT.Pin3, TT.Pin3, TT.Pin8, TT.Pin8,
+        TT.Sou3,
+      ),
+      melds: [],
+      winTile: tile(TT.Sou3),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("アガれる例3: 二盃口(ryanpeiko)は一盃口(iipeiko)の上位役なので OK", () => {
+    // 手牌: 112233m45566s白白, 待ち: 4s or 7s
+    // 4s → 123m×2 + 456s×2 + 白白 = 二盃口
+    // 7s → 123m×2 + 456s + 567s + 白白 = 一盃口
+    // 展開後の交差: {iipeiko} → OK
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Man1, TT.Man1, TT.Man2, TT.Man2, TT.Man3, TT.Man3,
+        TT.Sou4, TT.Sou5, TT.Sou5, TT.Sou6, TT.Sou6,
+        TT.Haku, TT.Haku,
+        TT.Sou4,
+      ),
+      melds: [],
+      winTile: tile(TT.Sou4),
+      isTsumo: false,
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("門前で待ち1種なら常にOK", () => {
+    // リーチのみの手でも待ちが1つなら後付けナシに引っかからない
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Man1, TT.Man2, TT.Man3,
+        TT.Sou4, TT.Sou5, TT.Sou6,
+        TT.Pin7, TT.Pin8, TT.Pin9,
+        TT.Ton, TT.Ton, TT.Ton,
+        TT.Haku, TT.Haku,
+      ),
+      melds: [],
+      winTile: tile(TT.Haku),
+      isTsumo: false,
+      isRiichi: true,
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+});
+
+// ===== ①と②の複合チェック =====
+
+describe("atozuke（後付け）— 複合チェック", () => {
+  it("アガれない例3(①): 片和了りで第一副露の関与が不定", () => {
+    // 手牌: 12345s444m西西, 第一副露: 789s, ロン: 3s or 6s
+    // 6s → 一気通貫(第一副露が絡む), 3s → 役なし → 片和了り＋第一副露不定
+    const melds: Meld[] = [
+      makeChiMeld([TT.Sou7, TT.Sou8, TT.Sou9], 3),
+    ];
+    // ロン 6s の場合（第一副露が一気通貫に絡む）でも片和了りでNG
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Sou1, TT.Sou2, TT.Sou3,
+        TT.Sou4, TT.Sou5, TT.Sou6,
+        TT.Man4, TT.Man4, TT.Man4,
+        TT.Sha, TT.Sha,
+      ),
+      melds,
+      winTile: tile(TT.Sou6),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(false);
+  });
+
+  it("タンヤオ副露は全面子型で常にOK", () => {
+    // 喰いタン: 全面子がタンヤオに絡む
+    const melds: Meld[] = [
+      makeChiMeld([TT.Sou2, TT.Sou3, TT.Sou4], 3),
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Man2, TT.Man3, TT.Man4,
+        TT.Pin5, TT.Pin6, TT.Pin7,
+        TT.Sou5, TT.Sou5, TT.Sou5,
+        TT.Man8, TT.Man8,
+      ),
+      melds,
+      winTile: tile(TT.Man8),
+      ruleConfig: withRule(atozukeNashiRule, { kuitan: true }),
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+
+  it("第一副露が役牌ポンなら常にOK", () => {
+    // 第一副露: 白ポン → 白が役に絡む
+    const melds: Meld[] = [
+      makePonMeld(TT.Haku, 1),
+    ];
+    const ctx = makeCtx({
+      handTiles: tiles(
+        TT.Man1, TT.Man2, TT.Man3,
+        TT.Sou4, TT.Sou5, TT.Sou6,
+        TT.Pin7, TT.Pin8, TT.Pin9,
+        TT.Sha, TT.Sha,
+      ),
+      melds,
+      winTile: tile(TT.Sha),
+      ruleConfig: atozukeNashiRule,
+    });
+    expect(isAtozukeAllowed(ctx)).toBe(true);
   });
 });

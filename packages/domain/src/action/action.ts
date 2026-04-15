@@ -13,7 +13,7 @@ import {
 import { isKyuushuKyuuhai } from "../hand/tenpai.js";
 import type { RuleConfig } from "../rule/index.js";
 import type { WinContext } from "../yaku/index.js";
-import { judgeWin } from "../yaku/index.js";
+import { judgeWin, checkAtozukeAllowed } from "../yaku/index.js";
 import type { PlayerAction } from "./types.js";
 import { ActionType } from "./types.js";
 
@@ -87,7 +87,8 @@ export function getActionsAfterDraw(params: {
     redDoraCount,
     ruleConfig,
   };
-  if (judgeWin(winCtx)) {
+  const tsumoResult = judgeWin(winCtx);
+  if (tsumoResult && checkAtozukeAllowed(winCtx, tsumoResult)) {
     actions.push({ type: ActionType.Tsumo, playerIndex });
   }
 
@@ -248,7 +249,8 @@ export function getActionsAfterDiscard(params: {
       redDoraCount,
       ruleConfig,
     };
-    if (judgeWin(winCtx)) {
+    const ronResult = judgeWin(winCtx);
+    if (ronResult && checkAtozukeAllowed(winCtx, ronResult)) {
       actions.push({ type: ActionType.Ron, playerIndex });
     }
   }
