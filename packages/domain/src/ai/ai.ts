@@ -458,6 +458,7 @@ export function playRoundWithAi(
         uraDoraCount: 0,
         redDoraCount: 0,
         canKyuushuKyuuhai: player.isFirstTurn && pIdx === state.activePlayerIndex,
+        kuikaeForbiddenTypes: state.kuikaeForbiddenTypes,
       });
 
       if (actions.length === 0) {

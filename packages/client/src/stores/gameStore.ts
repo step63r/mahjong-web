@@ -99,6 +99,7 @@ function getHumanDrawActions(round: RoundState, playerIndex: number): PlayerActi
     uraDoraCount: 0,
     redDoraCount: 0,
     canKyuushuKyuuhai: player.isFirstTurn,
+    kuikaeForbiddenTypes: round.kuikaeForbiddenTypes,
   });
 }
 
@@ -425,6 +426,7 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
         uraDoraCount: 0,
         redDoraCount: 0,
         canKyuushuKyuuhai: player.isFirstTurn,
+        kuikaeForbiddenTypes: state.kuikaeForbiddenTypes,
       });
 
       const chosen = AI.chooseAction(actions, state, pIdx);

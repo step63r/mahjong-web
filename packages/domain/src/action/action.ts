@@ -42,6 +42,7 @@ export function getActionsAfterDraw(params: {
   uraDoraCount: number;
   redDoraCount: number;
   canKyuushuKyuuhai: boolean;
+  kuikaeForbiddenTypes?: readonly TileType[];
 }): PlayerAction[] {
   const actions: PlayerAction[] = [];
   const {
@@ -159,9 +160,10 @@ export function getActionsAfterDraw(params: {
   }
 
   // --- 打牌（全手牌 + ツモ牌） ---
+  const forbidden = params.kuikaeForbiddenTypes ?? [];
   const discardTypes = new Set<TileType>();
   for (const tile of handTiles) {
-    if (!discardTypes.has(tile.type)) {
+    if (!discardTypes.has(tile.type) && !forbidden.includes(tile.type)) {
       discardTypes.add(tile.type);
       const isTsumogiri = isSameTile(tile, drawnTile);
       actions.push({ type: ActionType.Discard, playerIndex, tile, isTsumogiri });

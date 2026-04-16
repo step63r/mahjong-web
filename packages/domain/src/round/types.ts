@@ -148,6 +148,8 @@ export interface RoundState {
   chankanTile: Tile | undefined;
   /** chankanTile が暗槓由来かどうか（国士無双の暗槓ロン用） */
   isAnkanChankan: boolean;
+  /** 食い替えで禁止されている打牌の TileType（チー/ポン直後のみ有効、打牌後にクリア） */
+  kuikaeForbiddenTypes: readonly TileType[];
   /** 各プレイヤーの待ちアクション */
   pendingActions: Map<number, PlayerAction[]>;
 }

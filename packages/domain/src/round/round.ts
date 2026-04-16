@@ -19,6 +19,7 @@ import {
   createMinkanMeld,
   createAnkanMeld,
   createKakanMeld,
+  getKuikaeConstraint,
 } from "../meld/index.js";
 import { Wall } from "../wall/index.js";
 import type { RuleConfig } from "../rule/index.js";
@@ -90,6 +91,7 @@ export function createRound(params: {
     isRinshanDraw: false,
     chankanTile: undefined,
     isAnkanChankan: false,
+    kuikaeForbiddenTypes: [],
     pendingActions: new Map(),
   };
 }
@@ -282,6 +284,14 @@ function handleDiscard(
   isTsumogiri: boolean,
 ): RoundState {
   const player = state.players[playerIndex];
+
+  // 食い替え禁止バリデーション
+  if (state.kuikaeForbiddenTypes.length > 0) {
+    if (state.kuikaeForbiddenTypes.includes(tile.type)) {
+      throw new Error(`食い替え禁止: ${tile.type} は捨てられません`);
+    }
+    state.kuikaeForbiddenTypes = [];
+  }
 
   // 手牌から除去
   player.hand.removeTile(tile);
@@ -482,6 +492,11 @@ function handlePon(state: RoundState, playerIndex: number): RoundState {
   // ポン後はツモせず打牌のみ（hand は13枚のまま）
   // → DrawPhase だが手牌14枚ではないので、呼び出し側で打牌のみを提示する
 
+  // 食い替え禁止: ポンした牌と同種の牌を捨てられない
+  if (!state.ruleConfig.kuikae) {
+    state.kuikaeForbiddenTypes = [discardTile.type];
+  }
+
   return state;
 }
 
@@ -519,6 +534,12 @@ function handleChi(
   // アクティブプレイヤーを鳴いたプレイヤーに変更（打牌待ち）
   state.activePlayerIndex = playerIndex;
   state.phase = RoundPhase.DrawPhase;
+
+  // 食い替え禁止: チーした牌と同種の牌やスジ牌を捨てられない
+  if (!state.ruleConfig.kuikae) {
+    const constraint = getKuikaeConstraint(candidate);
+    state.kuikaeForbiddenTypes = constraint.forbiddenTypes;
+  }
 
   return state;
 }

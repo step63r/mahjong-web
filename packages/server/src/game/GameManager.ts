@@ -339,6 +339,7 @@ export class GameManager {
       uraDoraCount: 0,
       redDoraCount: 0,
       canKyuushuKyuuhai: player.isFirstTurn,
+      kuikaeForbiddenTypes: round.kuikaeForbiddenTypes,
     });
   }
 
