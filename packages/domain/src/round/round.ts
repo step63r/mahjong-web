@@ -11,6 +11,7 @@ import { Hand } from "../hand/index.js";
 import { getTenpaiTiles } from "../hand/index.js";
 import { Discard } from "../discard/index.js";
 import type { Meld } from "../meld/index.js";
+import { MeldType } from "../meld/index.js";
 import {
   findPonCandidates,
   findMinkanCandidate,
@@ -25,12 +26,12 @@ import { Wall } from "../wall/index.js";
 import type { RuleConfig } from "../rule/index.js";
 import { AbortiveDraw, RenchanCondition } from "../rule/index.js";
 import type { WinContext } from "../yaku/index.js";
-import { judgeWin } from "../yaku/index.js";
+import { Yaku, judgeWin } from "../yaku/index.js";
 import type { ScoreContext } from "../score/index.js";
 import { calculateScore } from "../score/index.js";
 import type { PlayerAction } from "../action/index.js";
 import { ActionType } from "../action/index.js";
-import type { RoundState, PlayerState, RoundResult, WinEntry } from "./types.js";
+import type { RoundState, PlayerState, RoundResult, WinEntry, PaoInfo } from "./types.js";
 import { RoundPhase, RoundEndReason } from "./types.js";
 
 // ===== 局の作成 =====
@@ -92,8 +93,63 @@ export function createRound(params: {
     chankanTile: undefined,
     isAnkanChankan: false,
     kuikaeForbiddenTypes: [],
+    paoInfos: [null, null, null, null],
     pendingActions: new Map(),
   };
+}
+
+// ===== 責任払い判定 =====
+
+/** 100 点単位に切り上げ（責任払い半額計算用） */
+function roundUp100Pao(n: number): number {
+  return Math.ceil(n / 100) * 100;
+}
+
+const SANGENPAI: readonly TileType[] = [TT.Haku, TT.Hatsu, TT.Chun];
+const KAZEHAI: readonly TileType[] = [TT.Ton, TT.Nan, TT.Sha, TT.Pei];
+
+/**
+ * 副露後に責任払いの条件が成立したかを判定し、成立していれば paoInfos に記録する。
+ * handlePon / handleMinkan の副露追加後に呼ぶ。
+ */
+function checkAndSetPao(
+  state: RoundState,
+  playerIndex: number,
+  fromPlayerIndex: number,
+  isMinkan: boolean,
+): void {
+  if (!state.ruleConfig.sekininBarai) return;
+  if (state.paoInfos[playerIndex] !== null) return; // 既に責任払い確定済み
+
+  const melds = state.players[playerIndex].melds;
+
+  // 大三元: 三元牌の刻子/槓子が3つ揃ったか
+  const sangenMeldCount = melds.filter(
+    (m) => m.type !== MeldType.Chi && SANGENPAI.includes(m.tiles[0].type),
+  ).length;
+  if (sangenMeldCount >= 3) {
+    state.paoInfos[playerIndex] = { responsiblePlayerIndex: fromPlayerIndex, triggerYaku: Yaku.Daisangen };
+    return;
+  }
+
+  // 大四喜: 風牌の刻子/槓子が4つ揃ったか
+  const kazeMeldCount = melds.filter(
+    (m) => m.type !== MeldType.Chi && KAZEHAI.includes(m.tiles[0].type),
+  ).length;
+  if (kazeMeldCount >= 4) {
+    state.paoInfos[playerIndex] = { responsiblePlayerIndex: fromPlayerIndex, triggerYaku: Yaku.Daisuushii };
+    return;
+  }
+
+  // 四槓子: 槓子が4つ（大明槓でトリガーされた場合のみ）
+  if (isMinkan) {
+    const kanCount = melds.filter(
+      (m) => m.type === MeldType.Minkan || m.type === MeldType.Ankan || m.type === MeldType.Kakan,
+    ).length;
+    if (kanCount >= 4) {
+      state.paoInfos[playerIndex] = { responsiblePlayerIndex: fromPlayerIndex, triggerYaku: Yaku.Suukantsu };
+    }
+  }
 }
 
 // ===== 局の開始（親のツモ） =====
@@ -207,9 +263,18 @@ function handleTsumo(state: RoundState, playerIndex: number): RoundState {
 
   // 得点変動
   const changes: [number, number, number, number] = [0, 0, 0, 0];
-  changes[playerIndex] = scoreResult.payment.totalWinnerGain;
-  if (playerIndex === state.dealerIndex) {
+  const pao = state.paoInfos[playerIndex];
+  const paoApplies = pao !== null && scoreResult.judgeResult.yakuList.some(
+    (yr) => yr.yaku === pao.triggerYaku,
+  );
+
+  if (paoApplies) {
+    // 責任払い: ツモ和了は責任者が全額支払い
+    changes[playerIndex] = scoreResult.payment.totalWinnerGain;
+    changes[pao.responsiblePlayerIndex] = -scoreResult.payment.totalWinnerGain;
+  } else if (playerIndex === state.dealerIndex) {
     // 親ツモ: 各子が支払う
+    changes[playerIndex] = scoreResult.payment.totalWinnerGain;
     for (let i = 0; i < 4; i++) {
       if (i !== playerIndex) {
         changes[i] = -scoreResult.payment.tsumoPaymentChild;
@@ -217,6 +282,7 @@ function handleTsumo(state: RoundState, playerIndex: number): RoundState {
     }
   } else {
     // 子ツモ: 親と子で異なる
+    changes[playerIndex] = scoreResult.payment.totalWinnerGain;
     for (let i = 0; i < 4; i++) {
       if (i === playerIndex) continue;
       if (i === state.dealerIndex) {
@@ -422,6 +488,9 @@ function handleMinkan(state: RoundState, playerIndex: number): RoundState {
   const meld = createMinkanMeld(candidate, discardTile, discardPlayer);
   player.melds.push(meld);
 
+  // 責任払い判定（大三元・大四喜・四槓子）
+  checkAndSetPao(state, playerIndex, discardPlayer, true);
+
   state.totalKanCount++;
   state.playerKanCounts[playerIndex]++;
 
@@ -479,6 +548,9 @@ function handlePon(state: RoundState, playerIndex: number): RoundState {
   // 副露を追加
   const meld = createPonMeld(ponTiles, discardTile, discardPlayer);
   player.melds.push(meld);
+
+  // 責任払い判定（大三元・大四喜）
+  checkAndSetPao(state, playerIndex, discardPlayer, false);
 
   // 全員の一発を消す
   clearAllIppatsu(state);
@@ -606,8 +678,23 @@ function processRon(
 
     wins.push({ winnerIndex, loserIndex: discardPlayerIndex, scoreResult });
 
-    changes[winnerIndex] += scoreResult.payment.totalWinnerGain;
-    changes[discardPlayerIndex] -= scoreResult.payment.ronLoserPayment;
+    // 責任払い判定
+    const pao = state.paoInfos[winnerIndex];
+    const paoApplies = pao !== null && pao.responsiblePlayerIndex !== discardPlayerIndex
+      && scoreResult.judgeResult.yakuList.some((yr) => yr.yaku === pao.triggerYaku);
+
+    if (paoApplies) {
+      // 責任払い: 放銃者と責任者が半額ずつ
+      const total = scoreResult.payment.ronLoserPayment;
+      const half = roundUp100Pao(total / 2);
+      const otherHalf = total - half;
+      changes[winnerIndex] += scoreResult.payment.totalWinnerGain;
+      changes[discardPlayerIndex] -= half;
+      changes[pao.responsiblePlayerIndex] -= otherHalf;
+    } else {
+      changes[winnerIndex] += scoreResult.payment.totalWinnerGain;
+      changes[discardPlayerIndex] -= scoreResult.payment.ronLoserPayment;
+    }
   }
 
   if (wins.length === 0) {

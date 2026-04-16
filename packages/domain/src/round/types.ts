@@ -6,6 +6,16 @@ import type { Wall } from "../wall/index.js";
 import type { RuleConfig } from "../rule/index.js";
 import type { ScoreResult } from "../score/index.js";
 import type { PlayerAction } from "../action/index.js";
+import type { Yaku } from "../yaku/index.js";
+
+// ===== 責任払い情報 =====
+
+export interface PaoInfo {
+  /** 責任払いの対象プレイヤー（副露させた人） */
+  readonly responsiblePlayerIndex: number;
+  /** 責任払いのトリガーとなった役 */
+  readonly triggerYaku: Yaku;
+}
 
 // ===== 局のフェーズ =====
 
@@ -150,6 +160,8 @@ export interface RoundState {
   isAnkanChankan: boolean;
   /** 食い替えで禁止されている打牌の TileType（チー/ポン直後のみ有効、打牌後にクリア） */
   kuikaeForbiddenTypes: readonly TileType[];
+  /** 責任払い情報（プレイヤーごと、null = 責任払いなし） */
+  paoInfos: [PaoInfo | null, PaoInfo | null, PaoInfo | null, PaoInfo | null];
   /** 各プレイヤーの待ちアクション */
   pendingActions: Map<number, PlayerAction[]>;
 }

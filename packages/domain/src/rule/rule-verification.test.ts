@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { TileType, TileType as TT, createAllTiles } from "../tile/index.js";
 import type { Tile } from "../tile/index.js";
 import type { Meld } from "../meld/index.js";
-import { MeldType, createAnkanMeld, findChiCandidates } from "../meld/index.js";
+import { MeldType, createAnkanMeld, createPonMeld, createMinkanMeld, findChiCandidates } from "../meld/index.js";
 import { Wall } from "../wall/index.js";
 import { Hand } from "../hand/index.js";
 import { ActionType } from "../action/index.js";
@@ -2762,5 +2762,346 @@ describe("kuikae（食い替え）", () => {
         isTsumogiri: false,
       });
     }).toThrow("食い替え禁止");
+  });
+});
+
+// =====================================================
+// sekininBarai（責任払い）
+// =====================================================
+
+describe("sekininBarai（責任払い）", () => {
+  // --- 大三元の責任払い ---
+
+  it("大三元 pao: ポンで3種目の三元牌を鳴かせた場合にツモ和了 → 責任者が全額支払い", () => {
+    const rule = withRule(defaultRule, { sekininBarai: true });
+
+    // P0: 白ポン済み + 發ポン済み + 中を手牌に持ち、和了形を組む
+    // 手牌: 中中中 + 123m + 55s（7枚、副露2つで計13枚相当）
+    const p0Hand = [
+      tile(TT.Chun, 0), tile(TT.Chun, 1), tile(TT.Chun, 2),
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0), tile(TT.Sou5, 1),
+      // フィラー（副露2つ分で手牌は実質7枚だが、buildControlledWall は13枚必要）
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+      tile(TT.Pin7, 0), tile(TT.Pin8, 0),
+    ];
+    const wall = buildControlledWall({ p0Hand, doraIndicator: tile(TT.Sha, 2) });
+    const state = createAndStart(rule, wall);
+
+    // 副露を手動セット（白ポン from P1、發ポン from P2）
+    const hakuPon = createPonMeld(
+      [tile(TT.Haku, 0), tile(TT.Haku, 1)], tile(TT.Haku, 2), 1,
+    );
+    const hatsuPon = createPonMeld(
+      [tile(TT.Hatsu, 0), tile(TT.Hatsu, 1)], tile(TT.Hatsu, 2), 2,
+    );
+    state.players[0].melds.push(hakuPon, hatsuPon);
+
+    // P3が中を捨てた状態を作る
+    const discardTile = tile(TT.Chun, 3);
+    state.players[3].discard.addDiscard(discardTile, false, false, state.turnCount);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 3;
+    state.phase = RoundPhase.AfterDiscard;
+
+    // P0がポン → pao が P3 に発生する
+    applyAction(state, { type: ActionType.Pon, playerIndex: 0 });
+    expect(state.paoInfos[0]).not.toBeNull();
+    expect(state.paoInfos[0]!.responsiblePlayerIndex).toBe(3);
+    expect(state.paoInfos[0]!.triggerYaku).toBe(Yaku.Daisangen);
+
+    // P0の手牌を和了形に整える（中ポン後は4枚: 123m 55s → ツモ5sで和了）
+    // 手動でツモ牌追加してツモ和了させる
+    // 現在 DrawPhase で打牌待ち → 不要牌を捨てて次巡ツモで和了
+    // 簡易的に: ツモ和了のための手牌を直接セットする
+    const p0 = state.players[0];
+    // 手牌をクリアして和了形をセット
+    const currentHand = [...p0.hand.getTiles()] as Tile[];
+    for (const t of currentHand) {
+      p0.hand.removeTile(t);
+    }
+    // 和了形: 123m + 55s（雀頭）+ ツモ牌
+    const winTiles = [
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0),
+    ];
+    for (const t of winTiles) p0.hand.addTile(t);
+
+    // ツモ牌を追加してツモ和了
+    const tsumoTile = tile(TT.Sou5, 1);
+    p0.hand.addTile(tsumoTile);
+    state.phase = RoundPhase.DrawPhase;
+    state.activePlayerIndex = 0;
+
+    applyAction(state, { type: ActionType.Tsumo, playerIndex: 0 });
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    const result = state.result!;
+    expect(result.wins[0].scoreResult.judgeResult.yakuList.some(
+      (y) => y.yaku === Yaku.Daisangen,
+    )).toBe(true);
+
+    // 責任払い: ツモ和了なので P3 が全額支払い
+    const changes = result.scoreChanges;
+    expect(changes[0]).toBeGreaterThan(0); // P0 が獲得
+    expect(changes[1]).toBe(0); // P1 は支払いなし
+    expect(changes[2]).toBe(0); // P2 は支払いなし
+    expect(changes[3]).toBe(-changes[0]); // P3 が全額支払い
+  });
+
+  it("大三元 pao: ロン和了（責任者以外から振り込み） → 放銃者と責任者が半額ずつ", () => {
+    const rule = withRule(defaultRule, { sekininBarai: true });
+
+    const p0Hand = [
+      tile(TT.Chun, 0), tile(TT.Chun, 1), tile(TT.Chun, 2),
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0), tile(TT.Sou5, 1),
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+      tile(TT.Pin7, 0), tile(TT.Pin8, 0),
+    ];
+    const wall = buildControlledWall({ p0Hand, doraIndicator: tile(TT.Sha, 2) });
+    const state = createAndStart(rule, wall);
+
+    // 副露セット
+    const hakuPon = createPonMeld(
+      [tile(TT.Haku, 0), tile(TT.Haku, 1)], tile(TT.Haku, 2), 1,
+    );
+    const hatsuPon = createPonMeld(
+      [tile(TT.Hatsu, 0), tile(TT.Hatsu, 1)], tile(TT.Hatsu, 2), 2,
+    );
+    state.players[0].melds.push(hakuPon, hatsuPon);
+
+    // P3が中を捨て → P0がポン → pao = P3
+    const discardTile = tile(TT.Chun, 3);
+    state.players[3].discard.addDiscard(discardTile, false, false, state.turnCount);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 3;
+    state.phase = RoundPhase.AfterDiscard;
+
+    applyAction(state, { type: ActionType.Pon, playerIndex: 0 });
+    expect(state.paoInfos[0]!.responsiblePlayerIndex).toBe(3);
+
+    // 手牌を和了形に: 123m + 5s（待ち）
+    const p0 = state.players[0];
+    const currentHand = [...p0.hand.getTiles()] as Tile[];
+    for (const t of currentHand) p0.hand.removeTile(t);
+    const handTiles = [
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0),
+    ];
+    for (const t of handTiles) p0.hand.addTile(t);
+
+    // 不要牌を1枚捨てる代わりに、直接ロン状態を作る
+    // P1が5sを捨てた → P0がロン
+    state.activePlayerIndex = 0;
+    // 打牌をシミュレート → P1の捨て牌からロン
+    // 直接 processRon を使うため state を設定
+    const ronTile = tile(TT.Sou5, 1);
+    state.players[1].discard.addDiscard(ronTile, false, false, state.turnCount);
+    state.lastDiscardTile = ronTile;
+    state.lastDiscardPlayerIndex = 1;
+    state.phase = RoundPhase.AfterDiscard;
+
+    applyAction(state, { type: ActionType.Ron, playerIndex: 0 });
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    const result = state.result!;
+    expect(result.wins[0].scoreResult.judgeResult.yakuList.some(
+      (y) => y.yaku === Yaku.Daisangen,
+    )).toBe(true);
+
+    // 責任払い: P1（放銃者）と P3（責任者）が半額ずつ
+    const changes = result.scoreChanges;
+    const totalPayment = result.wins[0].scoreResult.payment.ronLoserPayment;
+    expect(changes[0]).toBeGreaterThan(0);
+    expect(changes[1]).toBeLessThan(0); // 放銃者
+    expect(changes[2]).toBe(0);
+    expect(changes[3]).toBeLessThan(0); // 責任者
+    // 半額ずつ（合計が totalPayment）
+    expect(-changes[1] + -changes[3]).toBe(totalPayment);
+  });
+
+  it("大三元 pao: ロン和了（責任者から振り込み） → 通常通り責任者が全額支払い", () => {
+    const rule = withRule(defaultRule, { sekininBarai: true });
+
+    const p0Hand = [
+      tile(TT.Chun, 0), tile(TT.Chun, 1), tile(TT.Chun, 2),
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0), tile(TT.Sou5, 1),
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+      tile(TT.Pin7, 0), tile(TT.Pin8, 0),
+    ];
+    const wall = buildControlledWall({ p0Hand, doraIndicator: tile(TT.Sha, 2) });
+    const state = createAndStart(rule, wall);
+
+    // 副露セット
+    const hakuPon = createPonMeld(
+      [tile(TT.Haku, 0), tile(TT.Haku, 1)], tile(TT.Haku, 2), 1,
+    );
+    const hatsuPon = createPonMeld(
+      [tile(TT.Hatsu, 0), tile(TT.Hatsu, 1)], tile(TT.Hatsu, 2), 2,
+    );
+    state.players[0].melds.push(hakuPon, hatsuPon);
+
+    // P3が中を捨て → P0がポン → pao = P3
+    const discardTile = tile(TT.Chun, 3);
+    state.players[3].discard.addDiscard(discardTile, false, false, state.turnCount);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 3;
+    state.phase = RoundPhase.AfterDiscard;
+
+    applyAction(state, { type: ActionType.Pon, playerIndex: 0 });
+
+    // 手牌を和了形に
+    const p0 = state.players[0];
+    const currentHand = [...p0.hand.getTiles()] as Tile[];
+    for (const t of currentHand) p0.hand.removeTile(t);
+    for (const t of [
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0),
+    ]) p0.hand.addTile(t);
+
+    // P3（責任者自身）が5sを捨てた → P0がロン
+    const ronTile = tile(TT.Sou5, 1);
+    state.players[3].discard.addDiscard(ronTile, false, false, state.turnCount);
+    state.lastDiscardTile = ronTile;
+    state.lastDiscardPlayerIndex = 3;
+    state.phase = RoundPhase.AfterDiscard;
+
+    applyAction(state, { type: ActionType.Ron, playerIndex: 0 });
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    const changes = state.result!.scoreChanges;
+    // 責任者＝放銃者 → 通常ロンと同じ（P3が全額支払い）
+    expect(changes[0]).toBeGreaterThan(0);
+    expect(changes[1]).toBe(0);
+    expect(changes[2]).toBe(0);
+    expect(changes[3]).toBe(-changes[0]);
+  });
+
+  // --- 四槓子の責任払い ---
+
+  it("四槓子 pao: 大明槓で4つ目を鳴かせた場合 → 責任払いが成立する", () => {
+    const rule = withRule(defaultRule, { sekininBarai: true });
+
+    const p0Hand = [
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0), tile(TT.Sou5, 1),
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+      tile(TT.Pin4, 0), tile(TT.Pin5, 0), tile(TT.Pin6, 0),
+      tile(TT.Pin7, 0), tile(TT.Pin8, 0),
+    ];
+    const wall = buildControlledWall({ p0Hand, doraIndicator: tile(TT.Sha, 2) });
+    const state = createAndStart(rule, wall);
+
+    // 暗槓2つ + 明槓1つ = 3つの槓を手動セット
+    const ankan1 = createAnkanMeld([
+      tile(TT.Man7, 0), tile(TT.Man7, 1), tile(TT.Man7, 2), tile(TT.Man7, 3),
+    ]);
+    const ankan2 = createAnkanMeld([
+      tile(TT.Man8, 0), tile(TT.Man8, 1), tile(TT.Man8, 2), tile(TT.Man8, 3),
+    ]);
+    const minkan3 = createMinkanMeld(
+      [tile(TT.Man9, 0), tile(TT.Man9, 1), tile(TT.Man9, 2)], tile(TT.Man9, 3), 2,
+    );
+    state.players[0].melds.push(ankan1, ankan2, minkan3);
+    state.totalKanCount = 3;
+    state.playerKanCounts[0] = 3;
+
+    // P0は手牌に Man4 を3枚持っている状態にする
+    const p0 = state.players[0];
+    const currentHand = [...p0.hand.getTiles()] as Tile[];
+    for (const t of currentHand) p0.hand.removeTile(t);
+    for (const t of [
+      tile(TT.Man4, 0), tile(TT.Man4, 1), tile(TT.Man4, 2),
+      tile(TT.Sou5, 0),
+    ]) p0.hand.addTile(t);
+
+    // P1が Man4 を捨てた → P0が大明槓
+    const discardTile = tile(TT.Man4, 3);
+    state.players[1].discard.addDiscard(discardTile, false, false, state.turnCount);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 1;
+    state.phase = RoundPhase.AfterDiscard;
+
+    applyAction(state, { type: ActionType.Minkan, playerIndex: 0 });
+
+    // 四槓子の pao が P1 に成立
+    expect(state.paoInfos[0]).not.toBeNull();
+    expect(state.paoInfos[0]!.responsiblePlayerIndex).toBe(1);
+    expect(state.paoInfos[0]!.triggerYaku).toBe(Yaku.Suukantsu);
+  });
+
+  it("四槓子: 加槓で4つ目の槓 → 責任払いは成立しない", () => {
+    const rule = withRule(defaultRule, { sekininBarai: true });
+
+    const p0Hand = [
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0), tile(TT.Sou5, 1),
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+      tile(TT.Pin4, 0), tile(TT.Pin5, 0), tile(TT.Pin6, 0),
+      tile(TT.Pin7, 0), tile(TT.Pin8, 0),
+    ];
+    const wall = buildControlledWall({ p0Hand, doraIndicator: tile(TT.Sha, 2) });
+    const state = createAndStart(rule, wall);
+
+    // 暗槓2つ + 明槓1つ + ポン1つ = 槓3つ
+    const ankan1 = createAnkanMeld([
+      tile(TT.Man7, 0), tile(TT.Man7, 1), tile(TT.Man7, 2), tile(TT.Man7, 3),
+    ]);
+    const ankan2 = createAnkanMeld([
+      tile(TT.Man8, 0), tile(TT.Man8, 1), tile(TT.Man8, 2), tile(TT.Man8, 3),
+    ]);
+    const minkan3 = createMinkanMeld(
+      [tile(TT.Man9, 0), tile(TT.Man9, 1), tile(TT.Man9, 2)], tile(TT.Man9, 3), 2,
+    );
+    // Man4 のポン（P1から）
+    const ponMeld = createPonMeld(
+      [tile(TT.Man4, 0), tile(TT.Man4, 1)], tile(TT.Man4, 2), 1,
+    );
+    state.players[0].melds.push(ankan1, ankan2, minkan3, ponMeld);
+    state.totalKanCount = 3;
+    state.playerKanCounts[0] = 3;
+
+    // 加槓は handleKakan → checkAndSetPao は呼ばれない → pao 不成立
+    // paoInfos は null のまま
+    expect(state.paoInfos[0]).toBeNull();
+  });
+
+  // --- sekininBarai=false ---
+
+  it("sekininBarai=false: 責任払い無効 → pao が記録されない", () => {
+    const rule = withRule(defaultRule, { sekininBarai: false });
+
+    const p0Hand = [
+      tile(TT.Chun, 0), tile(TT.Chun, 1), tile(TT.Chun, 2),
+      tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+      tile(TT.Sou5, 0), tile(TT.Sou5, 1),
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+      tile(TT.Pin7, 0), tile(TT.Pin8, 0),
+    ];
+    const wall = buildControlledWall({ p0Hand, doraIndicator: tile(TT.Sha, 2) });
+    const state = createAndStart(rule, wall);
+
+    // 副露セット
+    const hakuPon = createPonMeld(
+      [tile(TT.Haku, 0), tile(TT.Haku, 1)], tile(TT.Haku, 2), 1,
+    );
+    const hatsuPon = createPonMeld(
+      [tile(TT.Hatsu, 0), tile(TT.Hatsu, 1)], tile(TT.Hatsu, 2), 2,
+    );
+    state.players[0].melds.push(hakuPon, hatsuPon);
+
+    // P3が中を捨て → P0がポン
+    const discardTile = tile(TT.Chun, 3);
+    state.players[3].discard.addDiscard(discardTile, false, false, state.turnCount);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 3;
+    state.phase = RoundPhase.AfterDiscard;
+
+    applyAction(state, { type: ActionType.Pon, playerIndex: 0 });
+
+    // 責任払い無効なので pao は記録されない
+    expect(state.paoInfos[0]).toBeNull();
   });
 });
