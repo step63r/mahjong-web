@@ -146,6 +146,8 @@ export interface RoundState {
   isRinshanDraw: boolean;
   /** 槓後のロン対象の牌（槍槓） */
   chankanTile: Tile | undefined;
+  /** chankanTile が暗槓由来かどうか（国士無双の暗槓ロン用） */
+  isAnkanChankan: boolean;
   /** 各プレイヤーの待ちアクション */
   pendingActions: Map<number, PlayerAction[]>;
 }

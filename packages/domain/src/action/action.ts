@@ -12,7 +12,7 @@ import {
 } from "../meld/index.js";
 import { isKyuushuKyuuhai } from "../hand/tenpai.js";
 import type { RuleConfig } from "../rule/index.js";
-import type { WinContext } from "../yaku/index.js";
+import type { WinContext, JudgeResult } from "../yaku/index.js";
 import { judgeWin, checkAtozukeAllowed } from "../yaku/index.js";
 import type { PlayerAction } from "./types.js";
 import { ActionType } from "./types.js";
@@ -286,4 +286,89 @@ export function getActionsAfterDiscard(params: {
   actions.push({ type: ActionType.Skip, playerIndex });
 
   return actions;
+}
+
+// ===== 暗槓後に取りうるアクション（国士無双の暗槓ロン用） =====
+
+/**
+ * 他家の暗槓に対して国士無双でロンできるかを判定する。
+ *
+ * kokushiAnkanRon=true の場合のみ呼ばれる。
+ * 国士無双（または国士無双十三面待ち）が成立する場合にのみロンを返す。
+ * 槍槓の1飜は付かない（isChankan=false で judgeWin を呼ぶ）。
+ */
+export function getActionsAfterAnkan(params: {
+  playerIndex: number;
+  hand: Hand;
+  melds: readonly Meld[];
+  ankanTile: Tile;
+  ankanPlayerIndex: number;
+  ruleConfig: RuleConfig;
+  seatWind: TileType;
+  roundWind: TileType;
+  isRiichi: boolean;
+  isDoubleRiichi: boolean;
+  isIppatsu: boolean;
+  isFuriten: boolean;
+  doraCount: number;
+  uraDoraCount: number;
+  redDoraCount: number;
+}): PlayerAction[] {
+  const actions: PlayerAction[] = [];
+  const {
+    playerIndex,
+    hand,
+    melds,
+    ankanTile,
+    ruleConfig,
+    seatWind,
+    roundWind,
+    isRiichi,
+    isDoubleRiichi,
+    isIppatsu,
+    isFuriten,
+    doraCount,
+    uraDoraCount,
+    redDoraCount,
+  } = params;
+
+  if (!isFuriten) {
+    const handTiles = hand.getTiles();
+    const winCtx: WinContext = {
+      handTiles: [...handTiles, ankanTile] as Tile[],
+      melds,
+      winTile: ankanTile,
+      isTsumo: false,
+      seatWind,
+      roundWind,
+      isRiichi,
+      isDoubleRiichi,
+      isIppatsu,
+      isHaitei: false,
+      isHoutei: false,
+      isRinshan: false,
+      isChankan: false, // 暗槓ロンでは槍槓の1飜は付かない
+      isTenhou: false,
+      isChiihou: false,
+      isRenhou: false,
+      doraCount,
+      uraDoraCount,
+      redDoraCount,
+      ruleConfig,
+    };
+    const result = judgeWin(winCtx);
+    if (result && isKokushiWin(result)) {
+      actions.push({ type: ActionType.Ron, playerIndex });
+    }
+  }
+
+  actions.push({ type: ActionType.Skip, playerIndex });
+  return actions;
+}
+
+/** 判定結果が国士無双（または国士無双十三面待ち）かどうか */
+function isKokushiWin(result: JudgeResult): boolean {
+  return result.yakuList.some(
+    (yr) => yr.yaku === "kokushi" || yr.yaku === "kokushi-juusanmen",
+  );
 }

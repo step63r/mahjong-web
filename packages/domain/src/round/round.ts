@@ -89,6 +89,7 @@ export function createRound(params: {
     playerKanCounts: [0, 0, 0, 0],
     isRinshanDraw: false,
     chankanTile: undefined,
+    isAnkanChankan: false,
     pendingActions: new Map(),
   };
 }
@@ -334,6 +335,14 @@ function handleAnkan(state: RoundState, playerIndex: number, tileType: TileType)
     return state;
   }
 
+  // 国士無双の暗槓ロンが有効な場合、他家のロン判定を挟む
+  if (state.ruleConfig.kokushiAnkanRon) {
+    state.chankanTile = tiles[0];
+    state.isAnkanChankan = true;
+    state.phase = RoundPhase.AfterKan;
+    return state;
+  }
+
   // 槓ドラ（暗槓は即乗り）
   state.wall.openKanDora();
 
@@ -557,8 +566,8 @@ function processRon(
   for (const winnerIndex of ronPlayerIndices) {
     const winCtx = buildWinContext(state, winnerIndex, discardTile, false);
 
-    // 槍槓判定
-    if (state.chankanTile && isSameTile(discardTile, state.chankanTile)) {
+    // 槍槓判定（暗槓ロンの場合は槍槓フラグを立てない）
+    if (state.chankanTile && isSameTile(discardTile, state.chankanTile) && !state.isAnkanChankan) {
       (winCtx as { isChankan: boolean }).isChankan = true;
     }
 
@@ -728,12 +737,19 @@ export function resolveAfterKan(
   }
 
   // ロンなし → 槓ドラを開いて嶺上牌ツモ
+  const isAnkan = state.isAnkanChankan;
   state.chankanTile = undefined;
+  state.isAnkanChankan = false;
 
-  // 槓ドラ
-  const kanDoraRule = state.ruleConfig.kanDora;
-  if (kanDoraRule === "immediate" || kanDoraRule === "after-discard") {
+  if (isAnkan) {
+    // 暗槓由来: 槓ドラはすでに handleAnkan の前段階では開いていないので、ここで開く
     state.wall.openKanDora();
+  } else {
+    // 加槓由来: ルールに応じて槓ドラを開く
+    const kanDoraRule = state.ruleConfig.kanDora;
+    if (kanDoraRule === "immediate" || kanDoraRule === "after-discard") {
+      state.wall.openKanDora();
+    }
   }
 
   // 嶺上牌ツモ

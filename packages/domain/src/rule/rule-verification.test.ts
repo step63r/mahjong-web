@@ -1281,7 +1281,7 @@ describe("suukaikan（四開槓）", () => {
   });
 
   it("suukaikan=disabled: 4回目の暗槓でも流局しない", () => {
-    const rule = withRule(defaultRule, { suukaikan: AbortiveDraw.Disabled });
+    const rule = withRule(defaultRule, { suukaikan: AbortiveDraw.Disabled, kokushiAnkanRon: false });
     const baseTiles = createAllTiles("none");
     const wall = Wall.fromTiles(baseTiles);
     const state = createAndStart(rule, wall);
@@ -2227,5 +2227,149 @@ describe("atozuke（後付け）— 複合チェック", () => {
       ruleConfig: atozukeNashiRule,
     });
     expect(isAtozukeAllowed(ctx)).toBe(true);
+  });
+});
+
+// ============================================================
+// kokushiAnkanRon（国士無双の暗槓ロン）
+// ============================================================
+
+describe("kokushiAnkanRon（国士無双の暗槓ロン）", () => {
+  const kokushiRule = withRule(defaultRule, { kokushiAnkanRon: true });
+  const noKokushiRule = withRule(defaultRule, { kokushiAnkanRon: false });
+
+  // 国士テンパイの13枚（Man1を待ち — Man9が雀頭）
+  const kokushiHandTypes = [
+    TT.Man9, TT.Man9, TT.Pin1, TT.Pin9, TT.Sou1, TT.Sou9,
+    TT.Ton, TT.Nan, TT.Sha, TT.Pei, TT.Haku, TT.Hatsu, TT.Chun,
+  ];
+
+  // 国士十三面テンパイの13枚（13種1枚ずつ）
+  const kokushi13HandTypes = [
+    TT.Man1, TT.Man9, TT.Pin1, TT.Pin9, TT.Sou1, TT.Sou9,
+    TT.Ton, TT.Nan, TT.Sha, TT.Pei, TT.Haku, TT.Hatsu, TT.Chun,
+  ];
+
+  it("kokushiAnkanRon=true: 暗槓牌で国士無双が成立する場合ロンできる", () => {
+    const baseTiles = createAllTiles("none");
+    const wall = Wall.fromTiles(baseTiles);
+    const state = createAndStart(kokushiRule, wall);
+
+    // P1に国士テンパイ手牌を設定（Man1待ち）
+    (state.players[1] as { hand: Hand }).hand = new Hand(tiles(...kokushiHandTypes));
+    (state.players[1] as { isFirstTurn: boolean }).isFirstTurn = false;
+
+    // P0にMan1×4を持たせて暗槓させる
+    const ankanHand = [
+      tile(TT.Man1, 100), tile(TT.Man1, 101), tile(TT.Man1, 102), tile(TT.Man1, 103),
+      ...tiles(TT.Man2, TT.Man3, TT.Man4, TT.Man5, TT.Man6, TT.Man7, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5),
+    ];
+    (state.players[0] as { hand: Hand }).hand = new Hand(ankanHand);
+
+    applyAction(state, { type: ActionType.Ankan, playerIndex: 0, tileType: TT.Man1 });
+
+    // AfterKan フェーズで、chankanTile が設定され、isAnkanChankan=true
+    expect(state.phase).toBe(RoundPhase.AfterKan);
+    expect(state.chankanTile).toBeDefined();
+    expect(state.isAnkanChankan).toBe(true);
+
+    // P1がロンできる
+    const playerActions = new Map<number, PlayerAction>();
+    playerActions.set(1, { type: ActionType.Ron, playerIndex: 1 });
+    playerActions.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    playerActions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+    resolveAfterKan(state, playerActions);
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    expect(state.result!.reason).toBe(RoundEndReason.Win);
+    // 槍槓の1飜は付かない — 国士無双役満のみ
+    const winEntry = state.result!.wins[0];
+    expect(winEntry.scoreResult.judgeResult.yakuList.some((y) => y.yaku === "kokushi")).toBe(true);
+    expect(winEntry.scoreResult.judgeResult.yakuList.some((y) => y.yaku === "chankan")).toBe(false);
+  });
+
+  it("kokushiAnkanRon=true: 国士十三面待ちでダブル役満", () => {
+    const baseTiles = createAllTiles("none");
+    const wall = Wall.fromTiles(baseTiles);
+    const state = createAndStart(kokushiRule, wall);
+
+    // P1に国士十三面テンパイ（13種1枚ずつ）
+    (state.players[1] as { hand: Hand }).hand = new Hand(tiles(...kokushi13HandTypes));
+    (state.players[1] as { isFirstTurn: boolean }).isFirstTurn = false;
+
+    // P0がMan1を暗槓
+    const ankanHand = [
+      tile(TT.Man1, 100), tile(TT.Man1, 101), tile(TT.Man1, 102), tile(TT.Man1, 103),
+      ...tiles(TT.Man2, TT.Man3, TT.Man4, TT.Man5, TT.Man6, TT.Man7, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5),
+    ];
+    (state.players[0] as { hand: Hand }).hand = new Hand(ankanHand);
+
+    applyAction(state, { type: ActionType.Ankan, playerIndex: 0, tileType: TT.Man1 });
+    expect(state.phase).toBe(RoundPhase.AfterKan);
+
+    const playerActions = new Map<number, PlayerAction>();
+    playerActions.set(1, { type: ActionType.Ron, playerIndex: 1 });
+    playerActions.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    playerActions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+    resolveAfterKan(state, playerActions);
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    const winEntry = state.result!.wins[0];
+    expect(winEntry.scoreResult.judgeResult.yakuList.some((y) => y.yaku === "kokushi-juusanmen")).toBe(true);
+  });
+
+  it("kokushiAnkanRon=true: 暗槓牌で国士が成立しない場合はAfterKanのまま進行", () => {
+    const baseTiles = createAllTiles("none");
+    const wall = Wall.fromTiles(baseTiles);
+    const state = createAndStart(kokushiRule, wall);
+
+    // P1に非国士の手牌
+    (state.players[1] as { hand: Hand }).hand = new Hand(
+      tiles(TT.Man1, TT.Man2, TT.Man3, TT.Man4, TT.Man5, TT.Man6, TT.Man7, TT.Man8, TT.Man9, TT.Pin1, TT.Pin2, TT.Pin3, TT.Pin4),
+    );
+
+    // P0がMan5を暗槓
+    const ankanHand = [
+      tile(TT.Man5, 100), tile(TT.Man5, 101), tile(TT.Man5, 102), tile(TT.Man5, 103),
+      ...tiles(TT.Sou1, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5, TT.Sou6, TT.Sou7, TT.Sou8, TT.Sou9, TT.Pin1),
+    ];
+    (state.players[0] as { hand: Hand }).hand = new Hand(ankanHand);
+
+    applyAction(state, { type: ActionType.Ankan, playerIndex: 0, tileType: TT.Man5 });
+    expect(state.phase).toBe(RoundPhase.AfterKan);
+
+    // 全員スキップ → 嶺上ツモへ進む
+    const playerActions = new Map<number, PlayerAction>();
+    playerActions.set(1, { type: ActionType.Skip, playerIndex: 1 });
+    playerActions.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    playerActions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+    resolveAfterKan(state, playerActions);
+
+    // ロンされずに進行（DrawPhase に戻る）
+    expect(state.phase).not.toBe(RoundPhase.Completed);
+  });
+
+  it("kokushiAnkanRon=false: 暗槓牌で国士が成立してもロンできない", () => {
+    const baseTiles = createAllTiles("none");
+    const wall = Wall.fromTiles(baseTiles);
+    const state = createAndStart(noKokushiRule, wall);
+
+    // P1に国士テンパイ
+    (state.players[1] as { hand: Hand }).hand = new Hand(tiles(...kokushiHandTypes));
+
+    // P0がMan1を暗槓
+    const ankanHand = [
+      tile(TT.Man1, 100), tile(TT.Man1, 101), tile(TT.Man1, 102), tile(TT.Man1, 103),
+      ...tiles(TT.Man2, TT.Man3, TT.Man4, TT.Man5, TT.Man6, TT.Man7, TT.Sou2, TT.Sou3, TT.Sou4, TT.Sou5),
+    ];
+    (state.players[0] as { hand: Hand }).hand = new Hand(ankanHand);
+
+    applyAction(state, { type: ActionType.Ankan, playerIndex: 0, tileType: TT.Man1 });
+
+    // kokushiAnkanRon=false なので AfterKan にならず、直接嶺上ツモへ
+    expect(state.isAnkanChankan).toBe(false);
+    expect(state.chankanTile).toBeUndefined();
+    // 通常の暗槓処理で DrawPhase に戻る
+    expect(state.phase).toBe(RoundPhase.DrawPhase);
   });
 });

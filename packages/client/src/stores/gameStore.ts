@@ -22,6 +22,7 @@ import {
   isFuriten,
   getActionsAfterDraw,
   getActionsAfterDiscard,
+  getActionsAfterAnkan,
   Wall,
   RoundPhase,
   GamePhase,
@@ -123,6 +124,55 @@ function getHumanAfterDiscardActions(round: RoundState, playerIndex: number): Pl
     isDoubleRiichi: player.isDoubleRiichi,
     isIppatsu: player.isIppatsu,
     isHoutei: round.wall.remainingDrawCount === 0,
+    isFuriten: isFuriten(round, playerIndex),
+    doraCount: 0,
+    uraDoraCount: 0,
+    redDoraCount: 0,
+  });
+}
+
+// ===== Helper: get after-kan actions (handles both ankan-chankan and kakan-chankan) =====
+
+function getAfterKanActions(round: RoundState, playerIndex: number): PlayerAction[] {
+  const chankanTile = round.chankanTile;
+  if (!chankanTile) return [{ type: ActionType.Skip, playerIndex }];
+
+  const kanPlayer = round.activePlayerIndex;
+  if (kanPlayer === playerIndex) return [{ type: ActionType.Skip, playerIndex }];
+
+  const player = round.players[playerIndex];
+  if (round.isAnkanChankan) {
+    return getActionsAfterAnkan({
+      playerIndex,
+      hand: player.hand,
+      melds: player.melds,
+      ankanTile: chankanTile,
+      ankanPlayerIndex: kanPlayer,
+      ruleConfig: round.ruleConfig,
+      seatWind: player.seatWind,
+      roundWind: round.roundWind,
+      isRiichi: player.isRiichi,
+      isDoubleRiichi: player.isDoubleRiichi,
+      isIppatsu: player.isIppatsu,
+      isFuriten: isFuriten(round, playerIndex),
+      doraCount: 0,
+      uraDoraCount: 0,
+      redDoraCount: 0,
+    });
+  }
+  return getActionsAfterDiscard({
+    playerIndex,
+    hand: player.hand,
+    melds: player.melds,
+    discardTile: chankanTile,
+    discardPlayerIndex: kanPlayer,
+    ruleConfig: round.ruleConfig,
+    seatWind: player.seatWind,
+    roundWind: round.roundWind,
+    isRiichi: player.isRiichi,
+    isDoubleRiichi: player.isDoubleRiichi,
+    isIppatsu: player.isIppatsu,
+    isHoutei: false,
     isFuriten: isFuriten(round, playerIndex),
     doraCount: 0,
     uraDoraCount: 0,
@@ -416,9 +466,9 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
   if (roundState.phase === RoundPhase.AfterKan) {
     const kanPlayer = roundState.activePlayerIndex;
 
-    // Check if human can ron (chankan)
+    // Check if human can ron (chankan / kokushi ankan ron)
     if (kanPlayer !== humanPlayerIndex && roundState.chankanTile) {
-      const humanActions = getHumanAfterDiscardActions(roundState, humanPlayerIndex);
+      const humanActions = getAfterKanActions(roundState, humanPlayerIndex);
       const ronActions = humanActions.filter((a) => a.type === ActionType.Ron);
 
       if (ronActions.length > 0) {
@@ -480,7 +530,6 @@ function resolveWithHumanAction(round: RoundState, humanIndex: number, humanActi
     resolveAfterDiscard(round, playerActions);
   } else if (round.phase === RoundPhase.AfterKan) {
     const kanPlayer = round.activePlayerIndex;
-    const chankanTile = round.chankanTile;
     const playerActions = new Map<number, PlayerAction>();
 
     for (let i = 0; i < 4; i++) {
@@ -489,34 +538,12 @@ function resolveWithHumanAction(round: RoundState, humanIndex: number, humanActi
         playerActions.set(i, humanAction);
         continue;
       }
-      if (chankanTile) {
-        const player = round.players[i];
-        const actions = getActionsAfterDiscard({
-          playerIndex: i,
-          hand: player.hand,
-          melds: player.melds,
-          discardTile: chankanTile,
-          discardPlayerIndex: kanPlayer,
-          ruleConfig: round.ruleConfig,
-          seatWind: player.seatWind,
-          roundWind: round.roundWind,
-          isRiichi: player.isRiichi,
-          isDoubleRiichi: player.isDoubleRiichi,
-          isIppatsu: player.isIppatsu,
-          isHoutei: false,
-          isFuriten: isFuriten(round, i),
-          doraCount: 0,
-          uraDoraCount: 0,
-          redDoraCount: 0,
-        });
-        const ronOrSkip = actions.filter(
-          (a) => a.type === ActionType.Ron || a.type === ActionType.Skip,
-        );
-        const chosen = ronOrSkip.length > 0 ? AI.chooseAction(ronOrSkip, round, i) : skipAction(i);
-        playerActions.set(i, chosen);
-      } else {
-        playerActions.set(i, skipAction(i));
-      }
+      const actions = getAfterKanActions(round, i);
+      const ronOrSkip = actions.filter(
+        (a) => a.type === ActionType.Ron || a.type === ActionType.Skip,
+      );
+      const chosen = ronOrSkip.length > 0 ? AI.chooseAction(ronOrSkip, round, i) : skipAction(i);
+      playerActions.set(i, chosen);
     }
     resolveAfterKan(round, playerActions);
   }
@@ -560,7 +587,6 @@ function resolveAllCpu(round: RoundState, humanIndex: number) {
 
 function resolveKanAllCpu(round: RoundState, humanIndex: number) {
   const kanPlayer = round.activePlayerIndex;
-  const chankanTile = round.chankanTile;
   const playerActions = new Map<number, PlayerAction>();
 
   for (let i = 0; i < 4; i++) {
@@ -569,34 +595,12 @@ function resolveKanAllCpu(round: RoundState, humanIndex: number) {
       playerActions.set(i, skipAction(i));
       continue;
     }
-    if (chankanTile) {
-      const player = round.players[i];
-      const actions = getActionsAfterDiscard({
-        playerIndex: i,
-        hand: player.hand,
-        melds: player.melds,
-        discardTile: chankanTile,
-        discardPlayerIndex: kanPlayer,
-        ruleConfig: round.ruleConfig,
-        seatWind: player.seatWind,
-        roundWind: round.roundWind,
-        isRiichi: player.isRiichi,
-        isDoubleRiichi: player.isDoubleRiichi,
-        isIppatsu: player.isIppatsu,
-        isHoutei: false,
-        isFuriten: isFuriten(round, i),
-        doraCount: 0,
-        uraDoraCount: 0,
-        redDoraCount: 0,
-      });
-      const ronOrSkip = actions.filter(
-        (a) => a.type === ActionType.Ron || a.type === ActionType.Skip,
-      );
-      const chosen = ronOrSkip.length > 0 ? AI.chooseAction(ronOrSkip, round, i) : skipAction(i);
-      playerActions.set(i, chosen);
-    } else {
-      playerActions.set(i, skipAction(i));
-    }
+    const actions = getAfterKanActions(round, i);
+    const ronOrSkip = actions.filter(
+      (a) => a.type === ActionType.Ron || a.type === ActionType.Skip,
+    );
+    const chosen = ronOrSkip.length > 0 ? AI.chooseAction(ronOrSkip, round, i) : skipAction(i);
+    playerActions.set(i, chosen);
   }
   resolveAfterKan(round, playerActions);
 }

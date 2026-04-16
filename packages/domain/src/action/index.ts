@@ -16,4 +16,4 @@ export type {
   SkipAction,
 } from "./types.js";
 
-export { getActionsAfterDraw, getActionsAfterDiscard } from "./action.js";
+export { getActionsAfterDraw, getActionsAfterDiscard, getActionsAfterAnkan } from "./action.js";

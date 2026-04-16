@@ -19,6 +19,7 @@ import {
   isFuriten,
   getActionsAfterDraw,
   getActionsAfterDiscard,
+  getActionsAfterAnkan,
   Wall,
   RoundPhase,
   GamePhase,
@@ -368,6 +369,31 @@ export class GameManager {
     });
   }
 
+  private getAfterAnkanActions(round: RoundState, playerIndex: number): PlayerAction[] {
+    const ankanTile = round.chankanTile;
+    const kanPlayer = round.activePlayerIndex;
+    if (!ankanTile || kanPlayer === playerIndex) return [];
+
+    const player = round.players[playerIndex];
+    return getActionsAfterAnkan({
+      playerIndex,
+      hand: player.hand,
+      melds: player.melds,
+      ankanTile,
+      ankanPlayerIndex: kanPlayer,
+      ruleConfig: round.ruleConfig,
+      seatWind: player.seatWind,
+      roundWind: round.roundWind,
+      isRiichi: player.isRiichi,
+      isDoubleRiichi: player.isDoubleRiichi,
+      isIppatsu: player.isIppatsu,
+      isFuriten: isFuriten(round, playerIndex),
+      doraCount: 0,
+      uraDoraCount: 0,
+      redDoraCount: 0,
+    });
+  }
+
   // ========== AfterDiscard処理 ==========
 
   private requestAfterDiscardActions(room: ActiveRoom): void {
@@ -416,7 +442,9 @@ export class GameManager {
 
     for (let i = 0; i < 4; i++) {
       if (i === kanPlayer) continue;
-      const actions = this.getAfterDiscardActions(round, i);
+      const actions = round.isAnkanChankan
+        ? this.getAfterAnkanActions(round, i)
+        : this.getAfterDiscardActions(round, i);
       const ronActions = actions.filter((a) => a.type === ActionType.Ron);
 
       if (ronActions.length === 0) {

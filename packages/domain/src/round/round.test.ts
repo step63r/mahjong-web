@@ -308,7 +308,8 @@ describe("リーチ", () => {
 
 describe("暗槓", () => {
   it("暗槓で4枚除去、副露追加、槓ドラ開示", () => {
-    const state = createAndStartRound();
+    const rule = { ...defaultRule(), kokushiAnkanRon: false };
+    const state = createAndStartRound(rule);
     const player = state.players[0];
 
     // テスト用: 手牌に同一牌4枚があると仮定して tileType 指定
