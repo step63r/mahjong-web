@@ -1047,7 +1047,11 @@ function buildWinContext(
   let uraDoraCount = 0;
   if (player.isRiichi && state.ruleConfig.uraDora) {
     const uraIndicators = state.wall.getUraDoraIndicators();
-    const uraDoraTypes = uraIndicators.map((t) => getDoraFromIndicator(t.type));
+    // kanUraDora=false の場合、通常裏ドラ（先頭1枚）のみ使用
+    const effectiveIndicators = state.ruleConfig.kanUraDora
+      ? uraIndicators
+      : uraIndicators.slice(0, 1);
+    const uraDoraTypes = effectiveIndicators.map((t) => getDoraFromIndicator(t.type));
     for (const t of allTiles) {
       if (uraDoraTypes.includes(t.type)) uraDoraCount++;
     }

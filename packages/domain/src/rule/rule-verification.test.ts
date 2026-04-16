@@ -2373,3 +2373,171 @@ describe("kokushiAnkanRon（国士無双の暗槓ロン）", () => {
     expect(state.phase).toBe(RoundPhase.DrawPhase);
   });
 });
+
+// =====================================================
+// kanUraDora（槓裏ドラ）
+// =====================================================
+
+describe("kanUraDora（槓裏ドラ）", () => {
+  /**
+   * 槓裏ドラ検証用の牌山を構築する。
+   * buildControlledWall に加え、槓ドラ表示牌(index 132)と
+   * 槓裏ドラ表示牌(index 133)も制御する。
+   */
+  function buildKanUraDoraWall(opts: {
+    p0Hand: Tile[];
+    p0Draw: Tile;
+    doraIndicator: Tile;
+    uraDoraIndicator: Tile;
+    kanDoraIndicator: Tile;
+    kanUraDoraIndicator: Tile;
+  }): Wall {
+    const baseTiles = createAllTiles("none");
+    const usedIds = new Set<string>();
+    const markUsed = (t: Tile) => usedIds.add(`${t.type}_${t.id}`);
+
+    for (const t of opts.p0Hand) markUsed(t);
+    markUsed(opts.p0Draw);
+    markUsed(opts.doraIndicator);
+    markUsed(opts.uraDoraIndicator);
+    markUsed(opts.kanDoraIndicator);
+    markUsed(opts.kanUraDoraIndicator);
+
+    const filler = baseTiles.filter((t) => !usedIds.has(`${t.type}_${t.id}`));
+    let fillerIdx = 0;
+    const nextFiller = () => filler[fillerIdx++];
+
+    const wall: Tile[] = new Array(136);
+    const p0Indices = [0, 1, 2, 3, 16, 17, 18, 19, 32, 33, 34, 35, 48];
+
+    for (let i = 0; i < 13; i++) {
+      wall[p0Indices[i]] = opts.p0Hand[i];
+    }
+    wall[52] = opts.p0Draw;
+
+    for (let i = 0; i < 136; i++) {
+      if (wall[i] === undefined) {
+        if (i === 130) wall[i] = opts.doraIndicator;
+        else if (i === 131) wall[i] = opts.uraDoraIndicator;
+        else if (i === 132) wall[i] = opts.kanDoraIndicator;
+        else if (i === 133) wall[i] = opts.kanUraDoraIndicator;
+        else wall[i] = nextFiller();
+      }
+    }
+
+    return Wall.fromTiles(wall);
+  }
+
+  // P0のテンパイ手牌（13枚）: 123m 456m 789s 123p 白（白の単騎待ち）
+  // 白（Haku）が2枚入るので、槓裏ドラ=白の場合に2飜加算される
+  const tenpaiHand = [
+    tile(TT.Man1, 0), tile(TT.Man2, 0), tile(TT.Man3, 0),
+    tile(TT.Man4, 0), tile(TT.Man5, 0), tile(TT.Man6, 0),
+    tile(TT.Sou7, 0), tile(TT.Sou8, 0), tile(TT.Sou9, 0),
+    tile(TT.Pin1, 0), tile(TT.Pin2, 0), tile(TT.Pin3, 0),
+    tile(TT.Haku, 0),
+  ];
+  // ツモ牌: 白 → 白の単騎待ちでツモ和了
+  const drawTile = tile(TT.Haku, 1);
+
+  // ドラ表示牌（手牌に影響しない牌を指定）
+  const doraInd = tile(TT.Sha, 2);         // ドラ=北（手牌に無い）
+  // 裏ドラ表示牌: 三萬 → 裏ドラ=四萬（手牌に四萬が1枚ある）
+  const uraDoraInd = tile(TT.Man3, 2);
+  // 槓ドラ表示牌（手牌に影響しない牌を指定）
+  const kanDoraInd = tile(TT.Pei, 2);      // 槓ドラ=東（手牌に無い）
+  // 槓裏ドラ表示牌: 中 → 槓裏ドラ=白（手牌に白が2枚ある）
+  const kanUraDoraInd = tile(TT.Chun, 0);
+
+  it("kanUraDora=true: リーチ和了で槓裏ドラが飜数に加算される", () => {
+    const rule = withRule(defaultRule, { kanUraDora: true, uraDora: true });
+    const wall = buildKanUraDoraWall({
+      p0Hand: tenpaiHand,
+      p0Draw: drawTile,
+      doraIndicator: doraInd,
+      uraDoraIndicator: uraDoraInd,
+      kanDoraIndicator: kanDoraInd,
+      kanUraDoraIndicator: kanUraDoraInd,
+    });
+    const state = createAndStart(rule, wall);
+
+    // 天和防止 + リーチ状態にする
+    state.players[0].isFirstTurn = false;
+    state.players[0].isRiichi = true;
+
+    // 槓ドラを1つ開く（槓が行われた状態を模擬）
+    state.wall.openKanDora();
+
+    // ツモ和了
+    applyAction(state, { type: ActionType.Tsumo, playerIndex: 0 });
+    expect(state.phase).toBe(RoundPhase.Completed);
+    expect(state.result).toBeDefined();
+    expect(state.result!.wins.length).toBe(1);
+
+    const sr = state.result!.wins[0].scoreResult;
+    // 役: リーチ(1) + ツモ(1) = 2飜
+    // 通常裏ドラ: 四萬=1枚 → 1
+    // 槓裏ドラ: 白=2枚 → 2
+    // totalHan = 2 + 1 + 2 = 5
+    expect(sr.totalHan).toBe(5);
+  });
+
+  it("kanUraDora=false: リーチ和了で槓裏ドラが加算されない（通常裏ドラのみ）", () => {
+    const rule = withRule(defaultRule, { kanUraDora: false, uraDora: true });
+    const wall = buildKanUraDoraWall({
+      p0Hand: tenpaiHand,
+      p0Draw: drawTile,
+      doraIndicator: doraInd,
+      uraDoraIndicator: uraDoraInd,
+      kanDoraIndicator: kanDoraInd,
+      kanUraDoraIndicator: kanUraDoraInd,
+    });
+    const state = createAndStart(rule, wall);
+
+    state.players[0].isFirstTurn = false;
+    state.players[0].isRiichi = true;
+
+    // 槓ドラを1つ開く
+    state.wall.openKanDora();
+
+    applyAction(state, { type: ActionType.Tsumo, playerIndex: 0 });
+    expect(state.phase).toBe(RoundPhase.Completed);
+    expect(state.result).toBeDefined();
+    expect(state.result!.wins.length).toBe(1);
+
+    const sr = state.result!.wins[0].scoreResult;
+    // 役: リーチ(1) + ツモ(1) = 2飜
+    // 通常裏ドラ: 四萬=1枚 → 1
+    // 槓裏ドラ: 無効 → 0
+    // totalHan = 2 + 1 + 0 = 3
+    expect(sr.totalHan).toBe(3);
+  });
+
+  it("kanUraDora=true でも槓が無い場合は槓裏ドラは加算されない", () => {
+    const rule = withRule(defaultRule, { kanUraDora: true, uraDora: true });
+    const wall = buildKanUraDoraWall({
+      p0Hand: tenpaiHand,
+      p0Draw: drawTile,
+      doraIndicator: doraInd,
+      uraDoraIndicator: uraDoraInd,
+      kanDoraIndicator: kanDoraInd,
+      kanUraDoraIndicator: kanUraDoraInd,
+    });
+    const state = createAndStart(rule, wall);
+
+    state.players[0].isFirstTurn = false;
+    state.players[0].isRiichi = true;
+
+    // 槓ドラを開かない（openKanDoraを呼ばない）
+
+    applyAction(state, { type: ActionType.Tsumo, playerIndex: 0 });
+    expect(state.phase).toBe(RoundPhase.Completed);
+
+    const sr = state.result!.wins[0].scoreResult;
+    // 役: リーチ(1) + ツモ(1) = 2飜
+    // 通常裏ドラ: 四萬=1枚 → 1
+    // 槓が無いので槓裏ドラ表示牌自体が返されない → 0
+    // totalHan = 2 + 1 + 0 = 3
+    expect(sr.totalHan).toBe(3);
+  });
+});
