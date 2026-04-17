@@ -6,7 +6,7 @@ const SEAT_LABELS = ["東", "南", "西", "北"] as const;
 
 export function RoomPage() {
   const navigate = useNavigate();
-  const { room, playerName, gameStarted, clearGameStarted, leaveRoom, startGame } =
+  const { room, playerName, gameStarted, clearGameStarted, leaveRoom, startGame, isConnecting } =
     useOnlineRoomStore();
 
   // ゲーム開始で対局画面へ遷移
@@ -17,12 +17,12 @@ export function RoomPage() {
     }
   }, [gameStarted, clearGameStarted, navigate]);
 
-  // ルーム情報がない場合はロビーへ戻す
+  // ルーム情報がなく接続中でもない場合はロビーへ戻す
   useEffect(() => {
-    if (!room) {
+    if (!room && !isConnecting) {
       navigate("/lobby");
     }
-  }, [room, navigate]);
+  }, [room, isConnecting, navigate]);
 
   if (!room) return null;
 

@@ -15,6 +15,8 @@ import type {
   ActionDto,
 } from "@mahjong-web/shared";
 import type { TileData, DiscardEntryData, MeldViewData, PlayerViewState } from "@/types";
+import { sortTiles } from "@mahjong-web/domain";
+import type { Tile } from "@mahjong-web/domain";
 
 // ===== 基本変換 =====
 
@@ -87,9 +89,9 @@ function selfToViewState(self: SelfPlayerView): PlayerViewState {
 
   if (hasDraw) {
     drawnTile = tiles[tiles.length - 1];
-    hand = tiles.slice(0, -1);
+    hand = sortTiles(tiles.slice(0, -1) as unknown as Tile[]).map(dtoToTileData);
   } else {
-    hand = tiles;
+    hand = sortTiles([...tiles] as unknown as Tile[]).map(dtoToTileData);
     drawnTile = undefined;
   }
 

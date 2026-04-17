@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOnlineRoomStore } from "@/stores/onlineRoomStore";
 
@@ -7,7 +7,7 @@ type Mode = "select" | "create" | "join";
 
 export function LobbyPage() {
   const navigate = useNavigate();
-  const { createRoom, joinRoom, isConnecting, error } = useOnlineRoomStore();
+  const { createRoom, joinRoom, isConnecting, error, room } = useOnlineRoomStore();
 
   const [mode, setMode] = useState<Mode>("select");
   const [playerName, setPlayerName] = useState("");
@@ -16,16 +16,21 @@ export function LobbyPage() {
 
   const nameValid = playerName.trim().length >= 1 && playerName.trim().length <= 20;
 
+  // room がセットされたら RoomPage へ遷移
+  useEffect(() => {
+    if (room) {
+      navigate("/room");
+    }
+  }, [room, navigate]);
+
   const handleCreate = () => {
     if (!nameValid) return;
     createRoom(playerName.trim(), gameLength);
-    navigate("/room");
   };
 
   const handleJoin = () => {
     if (!nameValid || roomId.trim().length === 0) return;
     joinRoom(roomId.trim().toUpperCase(), playerName.trim());
-    navigate("/room");
   };
 
   return (
