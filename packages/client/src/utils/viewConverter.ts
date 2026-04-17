@@ -263,9 +263,9 @@ export function computeWaitingTiles(
   // 自分の手牌（捨てる牌を除いた残り）
   for (const t of remaining) inc(t.type);
 
-  // 全プレイヤーの河
+  // 全プレイヤーの河（鳴かれた牌は副露で数えるので除外）
   for (const p of round.players) {
-    for (const entry of p.discard.getAllDiscards()) {
+    for (const entry of p.discard.getVisibleDiscards()) {
       inc(entry.tile.type);
     }
   }

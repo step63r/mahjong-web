@@ -278,10 +278,14 @@ export function computeOnlineWaitingTiles(
   // 自分の手牌（捨てる牌を除いた残り）
   for (const t of remaining) inc(t.type);
 
-  // 全プレイヤーの河
-  for (const d of view.self.discards) inc(d.tile.type);
+  // 全プレイヤーの河（鳴かれた牌は副露で数えるので除外）
+  for (const d of view.self.discards) {
+    if (d.calledByPlayerIndex === undefined) inc(d.tile.type);
+  }
   for (const opp of view.opponents) {
-    for (const d of opp.discards) inc(d.tile.type);
+    for (const d of opp.discards) {
+      if (d.calledByPlayerIndex === undefined) inc(d.tile.type);
+    }
   }
 
   // ドラ表示牌
