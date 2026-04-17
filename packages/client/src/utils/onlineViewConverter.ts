@@ -15,8 +15,8 @@ import type {
   ActionDto,
 } from "@mahjong-web/shared";
 import type { TileData, DiscardEntryData, MeldViewData, PlayerViewState } from "@/types";
-import { sortTiles } from "@mahjong-web/domain";
-import type { Tile } from "@mahjong-web/domain";
+import { sortTiles, getTenpaiTiles } from "@mahjong-web/domain";
+import type { Tile, TileType, Meld } from "@mahjong-web/domain";
 
 // ===== 基本変換 =====
 
@@ -29,6 +29,41 @@ function dtoToDiscardEntry(dto: DiscardEntryDto): DiscardEntryData {
     tile: dtoToTileData(dto.tile),
     isRiichi: dto.isRiichiDeclare,
   };
+}
+
+/**
+ * 捨て牌 DTO 配列を表示用に変換する。
+ * - 鳴かれた牌（calledByPlayerIndex あり）を除外して可視牌のみにする
+ * - リーチ宣言牌が鳴かれた場合、次の可視牌を横向き表示にする
+ */
+function convertDiscards(dtos: readonly DiscardEntryDto[]): DiscardEntryData[] {
+  // リーチ宣言牌が鳴かれたか判定
+  let riichiCalledNextVisible = false;
+  for (const dto of dtos) {
+    if (dto.isRiichiDeclare && dto.calledByPlayerIndex !== undefined) {
+      riichiCalledNextVisible = true;
+    }
+  }
+
+  // 可視牌（鳴かれていない牌）のみフィルタ
+  const visible = dtos.filter((d) => d.calledByPlayerIndex === undefined);
+
+  return visible.map((dto, idx) => {
+    let isRiichiRotated = false;
+    if (riichiCalledNextVisible && !dto.isRiichiDeclare) {
+      const prevVisibles = visible.slice(0, idx);
+      const hasRiichiVisible = prevVisibles.some((e) => e.isRiichiDeclare);
+      if (!hasRiichiVisible) {
+        isRiichiRotated = true;
+        riichiCalledNextVisible = false;
+      }
+    }
+    return {
+      tile: dtoToTileData(dto.tile),
+      isRiichi: dto.isRiichiDeclare,
+      isRiichiRotated,
+    };
+  });
 }
 
 /**
@@ -98,7 +133,7 @@ function selfToViewState(self: SelfPlayerView): PlayerViewState {
   return {
     hand,
     drawnTile,
-    discards: self.discards.map(dtoToDiscardEntry),
+    discards: convertDiscards(self.discards),
     melds: self.melds.map((m) => dtoToMeldView(m, self.seatIndex)),
     score: self.score,
   };
@@ -116,7 +151,7 @@ function opponentToViewState(opp: OpponentPlayerView): PlayerViewState {
   return {
     hand,
     drawnTile: undefined,
-    discards: opp.discards.map(dtoToDiscardEntry),
+    discards: convertDiscards(opp.discards),
     melds: opp.melds.map((m) => dtoToMeldView(m, opp.seatIndex)),
     score: opp.score,
   };
@@ -187,4 +222,83 @@ export function buildOnlineActionOptions(actions: ActionDto[]): OnlineActionOpti
   }
 
   return options;
+}
+
+// ===== Riichi helpers =====
+
+/**
+ * リーチアクションの候補牌 type 一覧を返す。
+ * UI 側でリーチモード中に候補牌をハイライトするために使用。
+ */
+export function getOnlineRiichiCandidateTileTypes(actions: ActionDto[]): Set<string> {
+  const types = new Set<string>();
+  for (const a of actions) {
+    if (a.type === "riichi" && a.tile) {
+      types.add(a.tile.type);
+    }
+  }
+  return types;
+}
+
+// ===== Riichi waiting tile info =====
+
+export interface OnlineWaitingTileInfo {
+  type: string;
+  remaining: number;
+}
+
+/**
+ * リーチ候補牌を捨てた場合の待ち牌リストと推定残り枚数を計算する。
+ * 対人戦では自分の可視情報（手牌・全河・ドラ表示牌・全副露）のみで概算する。
+ */
+export function computeOnlineWaitingTiles(
+  view: PlayerGameView,
+  discardTileType: string,
+): OnlineWaitingTileInfo[] {
+  const handTiles = view.self.handTiles;
+
+  // 捨てる牌を1枚除いた手牌で聴牌判定
+  let removed = false;
+  const remaining = handTiles.filter((t) => {
+    if (!removed && t.type === discardTileType) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
+  const closedTypes = remaining.map((t) => t.type) as TileType[];
+  const melds = view.self.melds as unknown as Meld[];
+  const waitTypes = getTenpaiTiles(closedTypes, melds);
+  if (waitTypes.length === 0) return [];
+
+  // 可視牌のtype別カウント
+  const visibleCount = new Map<string, number>();
+  const inc = (type: string) => visibleCount.set(type, (visibleCount.get(type) ?? 0) + 1);
+
+  // 自分の手牌（捨てる牌を除いた残り）
+  for (const t of remaining) inc(t.type);
+
+  // 全プレイヤーの河
+  for (const d of view.self.discards) inc(d.tile.type);
+  for (const opp of view.opponents) {
+    for (const d of opp.discards) inc(d.tile.type);
+  }
+
+  // ドラ表示牌
+  for (const t of view.doraIndicators) inc(t.type);
+
+  // 全プレイヤーの副露
+  for (const m of view.self.melds) {
+    for (const t of m.tiles) inc(t.type);
+  }
+  for (const opp of view.opponents) {
+    for (const m of opp.melds) {
+      for (const t of m.tiles) inc(t.type);
+    }
+  }
+
+  return waitTypes.map((type) => ({
+    type,
+    remaining: 4 - (visibleCount.get(type) ?? 0),
+  }));
 }

@@ -1,9 +1,14 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PixiGameBoard } from "@/components/board/PixiGameBoard";
 import { ActionButtons } from "@/components/action/ActionButtons";
 import { useOnlineGameStore } from "@/stores/onlineGameStore";
 import { useOnlineRoomStore } from "@/stores/onlineRoomStore";
+import {
+  getOnlineRiichiCandidateTileTypes,
+  computeOnlineWaitingTiles,
+} from "@/utils/onlineViewConverter";
+import type { OnlineWaitingTileInfo } from "@/utils/onlineViewConverter";
 import type { RoundResultDto, GameResultDto } from "@mahjong-web/shared";
 
 const SEAT_NAMES = ["自家", "下家", "対面", "上家"] as const;
@@ -57,9 +62,71 @@ export function OnlineGamePage() {
     [mySeat],
   );
 
+  // === リーチモード ===
+  const [riichiMode, setRiichiMode] = useState(false);
+  const [riichiSelectedIndex, setRiichiSelectedIndex] = useState<number | undefined>(undefined);
+
+  // リーチモード中の候補牌の手牌インデックス集合
+  const riichiCandidateIndices = useMemo(() => {
+    if (!riichiMode || !latestView) return undefined;
+    const candidateTypes = getOnlineRiichiCandidateTileTypes(availableActions);
+    if (candidateTypes.size === 0) return undefined;
+    const selfView = playerViews[0];
+    if (!selfView) return undefined;
+    const indices = new Set<number>();
+    for (let i = 0; i < selfView.hand.length; i++) {
+      if (candidateTypes.has(selfView.hand[i].type)) indices.add(i);
+    }
+    if (selfView.drawnTile && candidateTypes.has(selfView.drawnTile.type)) {
+      indices.add(selfView.hand.length);
+    }
+    return indices;
+  }, [riichiMode, latestView, availableActions, playerViews]);
+
+  // リーチモードで選択中の牌の待ち牌情報
+  const riichiWaitingTiles: OnlineWaitingTileInfo[] | undefined = useMemo(() => {
+    if (!riichiMode || riichiSelectedIndex === undefined || !latestView) return undefined;
+    const selfView = playerViews[0];
+    if (!selfView) return undefined;
+    const tile =
+      riichiSelectedIndex === selfView.hand.length ? selfView.drawnTile : selfView.hand[riichiSelectedIndex];
+    if (!tile) return undefined;
+    return computeOnlineWaitingTiles(latestView, tile.type);
+  }, [riichiMode, riichiSelectedIndex, latestView, playerViews]);
+
+  // フェーズが変わったらリーチモードを解除
+  useEffect(() => {
+    setRiichiMode(false);
+    setRiichiSelectedIndex(undefined);
+  }, [uiPhase]);
+
   const handleTileClick = useCallback(
     (index: number) => {
       if (uiPhase !== "myTurn") return;
+
+      // リーチモード中: 1回目は選択、同じ牌を2回目でリーチ確定
+      if (riichiMode) {
+        if (riichiSelectedIndex === index) {
+          // 確定: リーチアクション実行
+          const selfView = playerViews[0];
+          if (!selfView) return;
+          const sortedTile =
+            index === selfView.hand.length ? selfView.drawnTile : selfView.hand[index];
+          if (sortedTile) {
+            const match = availableActions.find(
+              (a) => a.type === "riichi" && a.tile?.type === sortedTile.type,
+            );
+            if (match) {
+              setRiichiMode(false);
+              setRiichiSelectedIndex(undefined);
+              sendAction(match);
+            }
+          }
+        } else {
+          setRiichiSelectedIndex(index);
+        }
+        return;
+      }
 
       if (selectedTileIndex === index) {
         // ダブルクリックで打牌
@@ -79,7 +146,7 @@ export function OnlineGamePage() {
         selectTile(index);
       }
     },
-    [uiPhase, selectedTileIndex, availableActions, playerViews, sendAction, selectTile],
+    [uiPhase, riichiMode, riichiSelectedIndex, selectedTileIndex, availableActions, playerViews, sendAction, selectTile],
   );
 
   const handleAction = useCallback(
@@ -89,13 +156,25 @@ export function OnlineGamePage() {
         if (skipAction) sendAction(skipAction);
         return;
       }
+      // リーチボタン: リーチモードに入る
+      if (type === "riichi") {
+        setRiichiMode(true);
+        setRiichiSelectedIndex(undefined);
+        selectTile(undefined);
+        return;
+      }
       const option = actionOptions.find((o) => o.type === type);
       if (option) {
         sendAction(option.dto);
       }
     },
-    [availableActions, actionOptions, sendAction],
+    [availableActions, actionOptions, sendAction, selectTile],
   );
+
+  const handleCancelRiichi = useCallback(() => {
+    setRiichiMode(false);
+    setRiichiSelectedIndex(undefined);
+  }, []);
 
   const handleBackToLobby = useCallback(() => {
     reset();
@@ -132,11 +211,19 @@ export function OnlineGamePage() {
         currentPlayer={relativeCurrentPlayer}
         dealerIndex={relativeDealer}
         initialDealerIndex={relativeInitialDealer}
-        selectedTileIndex={isMyTurn ? selectedTileIndex : undefined}
+        selectedTileIndex={isMyTurn && !riichiMode ? selectedTileIndex : undefined}
+        riichiSelectedIndex={isMyTurn && riichiMode ? riichiSelectedIndex : undefined}
+        riichiWaitingTiles={isMyTurn && riichiMode ? riichiWaitingTiles : undefined}
         onTileClick={isMyTurn ? handleTileClick : undefined}
+        riichiCandidateIndices={isMyTurn ? riichiCandidateIndices : undefined}
         actionButtons={
           isMyTurn ? (
-            <ActionButtons actions={actionOptions} onAction={handleAction} />
+            <ActionButtons
+              actions={actionOptions}
+              onAction={handleAction}
+              riichiMode={riichiMode}
+              onCancelRiichi={handleCancelRiichi}
+            />
           ) : undefined
         }
       />
