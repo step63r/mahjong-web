@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { TileType as TT, type Tile, createAllTiles, isSameTile } from "../tile/index.js";
 import { Wall } from "../wall/index.js";
 import { Hand } from "../hand/index.js";
+import { createPonMeld } from "../meld/index.js";
+import type { Meld } from "../meld/index.js";
+import { getActionsAfterDiscard } from "../action/action.js";
 import { createDefaultRuleConfig, AbortiveDraw } from "../rule/index.js";
 import type { RuleConfig } from "../rule/index.js";
 import { ActionType, type PlayerAction } from "../action/index.js";
@@ -566,5 +569,85 @@ describe("暗槓の槓ドラ", () => {
 
     // after-discard でも暗槓は即乗り
     expect(state.wall.getDoraIndicators().length).toBe(2);
+  });
+});
+
+// ===== 3副露テンパイでのロン検出テスト =====
+
+describe("3副露テンパイでのロン", () => {
+  it("resolveAfterDiscard でロンがポンより優先される（大三元手）", () => {
+    // セットアップ: player 3（上家）が 77p南南 + 中中中/發發發/白白白 の3副露テンパイ
+    // player 2（対面）が南を捨てる → player 3 がロン（大三元）すべき
+    const state = createAndStartRound();
+
+    // player 3 の手牌・副露を手動で設定
+    const p3 = state.players[3];
+    // 手牌をクリアして77p南南に
+    while (p3.hand.getTiles().length > 0) {
+      p3.hand.removeTile(p3.hand.getTiles()[0]);
+    }
+    p3.hand.addTile(tile(TT.Pin7, 100));
+    p3.hand.addTile(tile(TT.Pin7, 101));
+    p3.hand.addTile(tile(TT.Nan, 102));
+    p3.hand.addTile(tile(TT.Nan, 103));
+
+    // 3副露: 中中中、發發發、白白白（すべてポン、from player 0）
+    p3.melds.length = 0;
+    p3.melds.push(
+      createPonMeld([tile(TT.Chun, 200), tile(TT.Chun, 201)], tile(TT.Chun, 202), 0),
+    );
+    p3.melds.push(
+      createPonMeld([tile(TT.Hatsu, 210), tile(TT.Hatsu, 211)], tile(TT.Hatsu, 212), 0),
+    );
+    p3.melds.push(
+      createPonMeld([tile(TT.Haku, 220), tile(TT.Haku, 221)], tile(TT.Haku, 222), 0),
+    );
+
+    // player 2 が南を捨てた状態にする
+    const discardTile = tile(TT.Nan, 300);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 2;
+    state.phase = RoundPhase.AfterDiscard;
+
+    // player 3 のアクション検出
+    const actions = getActionsAfterDiscard({
+      playerIndex: 3,
+      hand: p3.hand,
+      melds: p3.melds,
+      discardTile,
+      discardPlayerIndex: 2,
+      ruleConfig: state.ruleConfig,
+      seatWind: p3.seatWind,
+      roundWind: state.roundWind,
+      isRiichi: false,
+      isDoubleRiichi: false,
+      isIppatsu: false,
+      isHoutei: false,
+      isFuriten: isFuriten(state, 3),
+      doraCount: 0,
+      uraDoraCount: 0,
+      redDoraCount: 0,
+    });
+
+    // ロンとポン両方が含まれることを確認
+    const ronAction = actions.find((a) => a.type === ActionType.Ron);
+    const ponAction = actions.find((a) => a.type === ActionType.Pon);
+    expect(ronAction).toBeDefined();
+    expect(ponAction).toBeDefined();
+
+    // resolveAfterDiscard でロンが優先される
+    const playerActions = new Map<number, PlayerAction>();
+    playerActions.set(0, { type: ActionType.Skip, playerIndex: 0 });
+    playerActions.set(1, { type: ActionType.Skip, playerIndex: 1 });
+    playerActions.set(3, ronAction!);
+
+    resolveAfterDiscard(state, playerActions);
+
+    // ロンで局が完了する
+    expect(state.phase).toBe(RoundPhase.Completed);
+    expect(state.result).toBeDefined();
+    expect(state.result!.reason).toBe(RoundEndReason.Win);
+    expect(state.result!.wins[0].winnerIndex).toBe(3);
+    expect(state.result!.wins[0].loserIndex).toBe(2);
   });
 });

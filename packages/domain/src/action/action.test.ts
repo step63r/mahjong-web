@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { TileType as TT, type Tile } from "../tile/index.js";
 import { Hand } from "../hand/index.js";
 import { createDefaultRuleConfig } from "../rule/index.js";
+import { createPonMeld } from "../meld/index.js";
+import type { Meld } from "../meld/index.js";
 import { ActionType } from "./types.js";
 import { getActionsAfterDraw, getActionsAfterDiscard } from "./action.js";
 
@@ -496,5 +498,44 @@ describe("getActionsAfterDiscard", () => {
     });
 
     expect(actions.some((a) => a.type === ActionType.Ron)).toBe(false);
+  });
+
+  it("3副露＋テンパイでロンが検出される（大三元手）", () => {
+    // 手牌: 7p7p南南（4枚）、副露: 中中中 發發發 白白白
+    const hand = new Hand([
+      tile(TT.Pin7, 0),
+      tile(TT.Pin7, 1),
+      tile(TT.Nan, 0),
+      tile(TT.Nan, 1),
+    ]);
+
+    const melds: Meld[] = [
+      createPonMeld([tile(TT.Chun, 0), tile(TT.Chun, 1)], tile(TT.Chun, 2), 0),
+      createPonMeld([tile(TT.Hatsu, 0), tile(TT.Hatsu, 1)], tile(TT.Hatsu, 2), 0),
+      createPonMeld([tile(TT.Haku, 0), tile(TT.Haku, 1)], tile(TT.Haku, 2), 0),
+    ];
+
+    const actions = getActionsAfterDiscard({
+      playerIndex: 1,
+      hand,
+      melds,
+      discardTile: tile(TT.Nan, 2),
+      discardPlayerIndex: 2,
+      ruleConfig: defaultRule,
+      seatWind: TT.Nan,
+      roundWind: TT.Ton,
+      isRiichi: false,
+      isDoubleRiichi: false,
+      isIppatsu: false,
+      isHoutei: false,
+      isFuriten: false,
+      doraCount: 0,
+      uraDoraCount: 0,
+      redDoraCount: 0,
+    });
+
+    // ロンとポンの両方が含まれるべき
+    expect(actions.some((a) => a.type === ActionType.Ron)).toBe(true);
+    expect(actions.some((a) => a.type === ActionType.Pon)).toBe(true);
   });
 });
