@@ -162,6 +162,8 @@ export interface RoundState {
   kuikaeForbiddenTypes: readonly TileType[];
   /** 責任払い情報（プレイヤーごと、null = 責任払いなし） */
   paoInfos: [PaoInfo | null, PaoInfo | null, PaoInfo | null, PaoInfo | null];
+  /** 明槓/加槓後、打牌後に槓ドラをめくるフラグ（kanDora=after-discard 時に使用） */
+  pendingKanDora: boolean;
   /** 各プレイヤーの待ちアクション */
   pendingActions: Map<number, PlayerAction[]>;
 }

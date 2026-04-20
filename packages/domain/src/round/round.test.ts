@@ -403,3 +403,106 @@ describe("isFuriten", () => {
     expect(isFuriten(state, 0)).toBe(false);
   });
 });
+
+// ===== 明槓の槓ドラ（kanDora ルール別） =====
+
+describe("明槓の槓ドラ", () => {
+  /** 明槓テスト用の手牌セットアップ */
+  function setupMinkanScenario(kanDora: "immediate" | "after-discard" | "none") {
+    const rule: RuleConfig = {
+      ...defaultRule(),
+      kanDora,
+      kokushiAnkanRon: false,
+    };
+    const state = createAndStartRound(rule);
+
+    // P0: man1 を含む14枚
+    (state.players[0] as { hand: Hand }).hand = new Hand([
+      tile(TT.Man1, 0),
+      tile(TT.Man2, 0), tile(TT.Man3, 0), tile(TT.Man4, 0), tile(TT.Man5, 0),
+      tile(TT.Man6, 0), tile(TT.Man7, 0), tile(TT.Man8, 0), tile(TT.Man9, 0),
+      tile(TT.Sou1, 0), tile(TT.Sou2, 0), tile(TT.Sou3, 0),
+      tile(TT.Pin1, 0), tile(TT.Pin2, 0),
+    ]);
+
+    // P1: man1 を3枚含む13枚
+    (state.players[1] as { hand: Hand }).hand = new Hand([
+      tile(TT.Man1, 1), tile(TT.Man1, 2), tile(TT.Man1, 3),
+      tile(TT.Sou4, 0), tile(TT.Sou5, 0), tile(TT.Sou6, 0), tile(TT.Sou7, 0),
+      tile(TT.Sou8, 0), tile(TT.Sou9, 0), tile(TT.Pin3, 0), tile(TT.Pin4, 0),
+      tile(TT.Pin5, 0), tile(TT.Pin6, 0),
+    ]);
+
+    return state;
+  }
+
+  /** P0 が man1 を打牌 → P1 が大明槓 */
+  function doMinkan(state: RoundState) {
+    applyAction(state, {
+      type: ActionType.Discard,
+      playerIndex: 0,
+      tile: tile(TT.Man1, 0),
+      isTsumogiri: false,
+    });
+
+    const actions = new Map<number, PlayerAction>();
+    actions.set(1, { type: ActionType.Minkan, playerIndex: 1 });
+    actions.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    actions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+    resolveAfterDiscard(state, actions);
+  }
+
+  it('kanDora="after-discard": 明槓直後は槓ドラが開かず、打牌後に開く', () => {
+    const state = setupMinkanScenario("after-discard");
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    doMinkan(state);
+
+    // 明槓後: まだ槓ドラは開いていない
+    expect(state.phase).toBe(RoundPhase.DrawPhase);
+    expect(state.activePlayerIndex).toBe(1);
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    // P1 が打牌
+    const p1Hand = state.players[1].hand.getTiles();
+    applyAction(state, {
+      type: ActionType.Discard,
+      playerIndex: 1,
+      tile: p1Hand[0],
+      isTsumogiri: false,
+    });
+
+    // 打牌後に槓ドラがめくられる
+    expect(state.wall.getDoraIndicators().length).toBe(2);
+  });
+
+  it('kanDora="immediate": 明槓直後に槓ドラが開く', () => {
+    const state = setupMinkanScenario("immediate");
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    doMinkan(state);
+
+    // immediate: 明槓直後に槓ドラが開く
+    expect(state.wall.getDoraIndicators().length).toBe(2);
+  });
+
+  it('kanDora="none": 明槓しても打牌しても槓ドラが開かない', () => {
+    const state = setupMinkanScenario("none");
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    doMinkan(state);
+
+    // none: 槓ドラは開かない
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    // P1 が打牌しても槓ドラは開かない
+    const p1Hand = state.players[1].hand.getTiles();
+    applyAction(state, {
+      type: ActionType.Discard,
+      playerIndex: 1,
+      tile: p1Hand[0],
+      isTsumogiri: false,
+    });
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+  });
+});

@@ -94,6 +94,7 @@ export function createRound(params: {
     isAnkanChankan: false,
     kuikaeForbiddenTypes: [],
     paoInfos: [null, null, null, null],
+    pendingKanDora: false,
     pendingActions: new Map(),
   };
 }
@@ -371,6 +372,13 @@ function handleDiscard(
   // 打牌後の状態
   state.lastDiscardTile = tile;
   state.lastDiscardPlayerIndex = playerIndex;
+
+  // 明槓/加槓後の打牌で槓ドラをめくる（kanDora=after-discard）
+  if (state.pendingKanDora) {
+    state.wall.openKanDora();
+    state.pendingKanDora = false;
+  }
+
   state.phase = RoundPhase.AfterDiscard;
 
   // 四風子連打チェック
@@ -508,8 +516,11 @@ function handleMinkan(state: RoundState, playerIndex: number): RoundState {
   // 槓ドラ（明槓は打牌後に乗る場合あり → ルール依存）
   if (state.ruleConfig.kanDora === "immediate") {
     state.wall.openKanDora();
+  } else if (state.ruleConfig.kanDora === "after-discard") {
+    // 嶺上ツモ後の打牌時にめくる
+    state.pendingKanDora = true;
   }
-  // after-discard の場合は嶺上ツモ打牌後に開く → advanceToNextDraw 等で管理
+  // after-discard の場合は handleDiscard で開く
 
   // 嶺上牌ツモ
   const rinshanTile = state.wall.drawRinshanTile();
@@ -855,8 +866,11 @@ export function resolveAfterKan(
   } else {
     // 加槓由来: ルールに応じて槓ドラを開く
     const kanDoraRule = state.ruleConfig.kanDora;
-    if (kanDoraRule === "immediate" || kanDoraRule === "after-discard") {
+    if (kanDoraRule === "immediate") {
       state.wall.openKanDora();
+    } else if (kanDoraRule === "after-discard") {
+      // 嶺上ツモ後の打牌時にめくる
+      state.pendingKanDora = true;
     }
   }
 
