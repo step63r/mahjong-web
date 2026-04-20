@@ -98,7 +98,7 @@ function getHumanDrawActions(round: RoundState, playerIndex: number): PlayerActi
     doraCount: 0,
     uraDoraCount: 0,
     redDoraCount: 0,
-    canKyuushuKyuuhai: player.isFirstTurn,
+    canKyuushuKyuuhai: player.isFirstTurn && round.ruleConfig.kyuushuKyuuhai !== "disabled",
     kuikaeForbiddenTypes: round.kuikaeForbiddenTypes,
   });
 }
@@ -425,7 +425,7 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
         doraCount: 0,
         uraDoraCount: 0,
         redDoraCount: 0,
-        canKyuushuKyuuhai: player.isFirstTurn,
+        canKyuushuKyuuhai: player.isFirstTurn && state.ruleConfig.kyuushuKyuuhai !== "disabled",
         kuikaeForbiddenTypes: state.kuikaeForbiddenTypes,
       });
 

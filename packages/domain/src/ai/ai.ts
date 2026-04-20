@@ -457,7 +457,7 @@ export function playRoundWithAi(
         doraCount: 0,
         uraDoraCount: 0,
         redDoraCount: 0,
-        canKyuushuKyuuhai: player.isFirstTurn && pIdx === state.activePlayerIndex,
+        canKyuushuKyuuhai: player.isFirstTurn && pIdx === state.activePlayerIndex && state.ruleConfig.kyuushuKyuuhai !== "disabled",
         kuikaeForbiddenTypes: state.kuikaeForbiddenTypes,
       });
 

@@ -188,6 +188,47 @@ describe("getActionsAfterDraw", () => {
     expect(actions.some((a) => a.type === ActionType.KyuushuKyuuhai)).toBe(true);
   });
 
+  it("canKyuushuKyuuhai=false のとき KyuushuKyuuhai が含まれない（ルール無効時）", () => {
+    // 幺九牌9種以上だが canKyuushuKyuuhai=false
+    const hand = new Hand([
+      tile(TT.Man1, 0),
+      tile(TT.Man9, 0),
+      tile(TT.Sou1, 0),
+      tile(TT.Sou9, 0),
+      tile(TT.Pin1, 0),
+      tile(TT.Pin9, 0),
+      tile(TT.Ton, 0),
+      tile(TT.Nan, 0),
+      tile(TT.Sha, 0),
+      tile(TT.Man2, 0),
+      tile(TT.Man3, 0),
+      tile(TT.Man4, 0),
+      tile(TT.Man5, 0),
+      tile(TT.Man6, 0),
+    ]);
+
+    const actions = getActionsAfterDraw({
+      playerIndex: 0,
+      hand,
+      melds: [],
+      drawnTile: tile(TT.Man6, 0),
+      ruleConfig: defaultRule,
+      seatWind: TT.Ton,
+      roundWind: TT.Ton,
+      isFirstDraw: true,
+      isRiichi: false,
+      isDoubleRiichi: false,
+      isIppatsu: false,
+      isHaitei: false,
+      doraCount: 0,
+      uraDoraCount: 0,
+      redDoraCount: 0,
+      canKyuushuKyuuhai: false,
+    });
+
+    expect(actions.some((a) => a.type === ActionType.KyuushuKyuuhai)).toBe(false);
+  });
+
   it("九種九牌が不可能な場合は KyuushuKyuuhai が含まれない", () => {
     const hand = new Hand([
       tile(TT.Man2, 0),
