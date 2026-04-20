@@ -432,7 +432,7 @@ describe("renhou（人和）", () => {
     expect(has).toBe(true);
   });
 
-  it("renhou=baiman: 人和が倍満（8飜）として成立", () => {
+  it("renhou=baiman: 人和が倍満（8飜）として成立、他の役は加算されない", () => {
     const rule = withRule(defaultRule, { renhou: RenhouRule.Baiman });
     const result = judgeWin(renhouCtx(rule));
     expect(result).not.toBeNull();
@@ -441,9 +441,12 @@ describe("renhou（人和）", () => {
     const renhouYaku = result!.yakuList.find((y) => y.yaku === Yaku.Renhou);
     expect(renhouYaku).toBeDefined();
     expect(renhouYaku!.han).toBe(8);
+    // 人和のみで構成され、他の役が加算されない
+    expect(result!.yakuList).toHaveLength(1);
+    expect(result!.totalHan).toBe(8);
   });
 
-  it("renhou=haneman: 人和が跳満（6飜）として成立", () => {
+  it("renhou=haneman: 人和が跳満（6飜）として成立、他の役は加算されない", () => {
     const rule = withRule(defaultRule, { renhou: RenhouRule.Haneman });
     const result = judgeWin(renhouCtx(rule));
     expect(result).not.toBeNull();
@@ -451,6 +454,9 @@ describe("renhou（人和）", () => {
     const renhouYaku = result!.yakuList.find((y) => y.yaku === Yaku.Renhou);
     expect(renhouYaku).toBeDefined();
     expect(renhouYaku!.han).toBe(6);
+    // 人和のみで構成され、他の役が加算されない
+    expect(result!.yakuList).toHaveLength(1);
+    expect(result!.totalHan).toBe(6);
   });
 
   it("renhou=none: 人和が無効（通常役のみで判定）", () => {

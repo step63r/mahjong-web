@@ -109,12 +109,10 @@ export function judgeWin(ctx: WinContext): JudgeResult | null {
         });
       }
       if (nonYakuman.length > 0) {
-        // 人和が倍満等の場合、通常役と合算
-        const normalYaku = checkAllNormalYaku(hand, ctx);
-        const combined = [...nonYakuman, ...normalYaku];
-        const totalHan = combined.reduce((sum, y) => sum + y.han, 0);
+        // 人和が倍満/跳満の場合、人和の飜数のみで点数を確定（他の役は加算しない）
+        const totalHan = nonYakuman.reduce((sum, y) => sum + y.han, 0);
         candidates.push({
-          yakuList: combined,
+          yakuList: nonYakuman,
           totalHan,
           totalYakumanTimes: 0,
           parsedHand: hand,
