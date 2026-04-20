@@ -506,3 +506,65 @@ describe("明槓の槓ドラ", () => {
     expect(state.wall.getDoraIndicators().length).toBe(1);
   });
 });
+
+// ===== 暗槓の槓ドラ（kanDora ルール別） =====
+
+describe("暗槓の槓ドラ", () => {
+  function setupAnkanScenario(kanDora: "immediate" | "after-discard" | "none") {
+    const rule: RuleConfig = {
+      ...defaultRule(),
+      kanDora,
+      kokushiAnkanRon: false,
+    };
+    const state = createAndStartRound(rule);
+
+    (state.players[0] as { hand: Hand }).hand = new Hand([
+      tile(TT.Man1, 0), tile(TT.Man1, 1), tile(TT.Man1, 2), tile(TT.Man1, 3),
+      tile(TT.Man2, 0), tile(TT.Man3, 0), tile(TT.Man4, 0), tile(TT.Man5, 0),
+      tile(TT.Man6, 0), tile(TT.Man7, 0), tile(TT.Man8, 0), tile(TT.Man9, 0),
+      tile(TT.Sou1, 0), tile(TT.Sou2, 0),
+    ]);
+
+    return state;
+  }
+
+  it('kanDora="none": 暗槓しても槓ドラが開かない', () => {
+    const state = setupAnkanScenario("none");
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    applyAction(state, {
+      type: ActionType.Ankan,
+      playerIndex: 0,
+      tileType: TT.Man1,
+    });
+
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+  });
+
+  it('kanDora="immediate": 暗槓で即座に槓ドラが開く', () => {
+    const state = setupAnkanScenario("immediate");
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    applyAction(state, {
+      type: ActionType.Ankan,
+      playerIndex: 0,
+      tileType: TT.Man1,
+    });
+
+    expect(state.wall.getDoraIndicators().length).toBe(2);
+  });
+
+  it('kanDora="after-discard": 暗槓は即乗りなので槓ドラが開く', () => {
+    const state = setupAnkanScenario("after-discard");
+    expect(state.wall.getDoraIndicators().length).toBe(1);
+
+    applyAction(state, {
+      type: ActionType.Ankan,
+      playerIndex: 0,
+      tileType: TT.Man1,
+    });
+
+    // after-discard でも暗槓は即乗り
+    expect(state.wall.getDoraIndicators().length).toBe(2);
+  });
+});

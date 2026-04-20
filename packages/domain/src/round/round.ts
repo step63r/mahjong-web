@@ -427,8 +427,10 @@ function handleAnkan(state: RoundState, playerIndex: number, tileType: TileType)
     return state;
   }
 
-  // 槓ドラ（暗槓は即乗り）
-  state.wall.openKanDora();
+  // 槓ドラ（暗槓は即乗り、ただし kanDora=none なら開かない）
+  if (state.ruleConfig.kanDora !== "none") {
+    state.wall.openKanDora();
+  }
 
   // 嶺上牌ツモ
   const rinshanTile = state.wall.drawRinshanTile();
@@ -862,7 +864,9 @@ export function resolveAfterKan(
 
   if (isAnkan) {
     // 暗槓由来: 槓ドラはすでに handleAnkan の前段階では開いていないので、ここで開く
-    state.wall.openKanDora();
+    if (state.ruleConfig.kanDora !== "none") {
+      state.wall.openKanDora();
+    }
   } else {
     // 加槓由来: ルールに応じて槓ドラを開く
     const kanDoraRule = state.ruleConfig.kanDora;
