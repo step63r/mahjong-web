@@ -1193,11 +1193,21 @@ function buildWinContext(
     isTsumo && player.isFirstTurn && playerIndex === state.dealerIndex && player.melds.length === 0;
   const isChiihou =
     isTsumo && player.isFirstTurn && playerIndex !== state.dealerIndex && player.melds.length === 0;
-  const isRenhou =
+
+  // 人和: 子が自分の最初のツモ前にロンした場合のみ
+  // 席順（dealer基準）で自分が打牌者より後ろであること = まだ自分のターンが来ていない
+  let isRenhou = false;
+  if (
     !isTsumo &&
     player.isFirstTurn &&
     playerIndex !== state.dealerIndex &&
-    player.melds.length === 0;
+    player.melds.length === 0 &&
+    state.lastDiscardPlayerIndex !== undefined
+  ) {
+    const playerOrder = (playerIndex - state.dealerIndex + 4) % 4;
+    const discardOrder = (state.lastDiscardPlayerIndex - state.dealerIndex + 4) % 4;
+    isRenhou = playerOrder > discardOrder;
+  }
 
   return {
     handTiles: handTiles as readonly Tile[],

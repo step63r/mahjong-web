@@ -651,3 +651,164 @@ describe("3副露テンパイでのロン", () => {
     expect(state.result!.wins[0].loserIndex).toBe(2);
   });
 });
+
+// ===== 人和の判定テスト =====
+
+describe("人和の判定", () => {
+  it("自分のターンが来る前のロンは人和となる", () => {
+    // dealer=0 が打牌、player 1 がロン → player 1 はまだツモしていない → 人和
+    const state = createAndStartRound();
+
+    // player 1 の手牌をテンパイ状態にする（萬子清一色テンパイ）
+    const p1 = state.players[1];
+    while (p1.hand.getTiles().length > 0) {
+      p1.hand.removeTile(p1.hand.getTiles()[0]);
+    }
+    // 1-2-3-4-5-6-7-8-9-1-2-3-東 のテンパイ（東待ち単騎は和了にならないので別の形に）
+    // 1-1-1-2-3-4-5-6-7-8-9-9-9 → 門前テンパイ、待ちは色々
+    p1.hand.addTile(tile(TT.Man1, 500));
+    p1.hand.addTile(tile(TT.Man1, 501));
+    p1.hand.addTile(tile(TT.Man1, 502));
+    p1.hand.addTile(tile(TT.Man2, 503));
+    p1.hand.addTile(tile(TT.Man3, 504));
+    p1.hand.addTile(tile(TT.Man4, 505));
+    p1.hand.addTile(tile(TT.Man5, 506));
+    p1.hand.addTile(tile(TT.Man6, 507));
+    p1.hand.addTile(tile(TT.Man7, 508));
+    p1.hand.addTile(tile(TT.Man8, 509));
+    p1.hand.addTile(tile(TT.Man9, 510));
+    p1.hand.addTile(tile(TT.Man9, 511));
+    p1.hand.addTile(tile(TT.Man9, 512));
+
+    // dealer(0) が東を捨てた状態にする
+    const discardTile = tile(TT.Ton, 600);
+    state.lastDiscardTile = discardTile;
+    state.lastDiscardPlayerIndex = 0;
+    state.phase = RoundPhase.AfterDiscard;
+
+    const playerActions = new Map<number, PlayerAction>();
+    playerActions.set(1, { type: ActionType.Ron, playerIndex: 1 });
+    playerActions.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    playerActions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+
+    resolveAfterDiscard(state, playerActions);
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    const win = state.result!.wins[0];
+    expect(win.winnerIndex).toBe(1);
+    // 人和（役満）の判定を確認
+    const yakuList = win.scoreResult.judgeResult.yakuList;
+    const hasRenhou = yakuList.some((y) => y.yaku === "renhou");
+    expect(hasRenhou).toBe(true);
+  });
+
+  it("自分のターンが既に来た後のロンは人和にならない", () => {
+    // dealer=0 が打牌 → player 1 がツモ・打牌 → player 2 がツモ・打牌 → player 1 がロン
+    // player 1 は既にターンが来ているので人和ではない
+    const state = createAndStartRound();
+
+    // player 0 (dealer) は既にツモ済み（startRound で配牌+ツモ済み）
+    // player 0 が打牌
+    const p0Hand = state.players[0].hand.getTiles();
+    applyAction(state, {
+      type: ActionType.Discard,
+      playerIndex: 0,
+      tile: p0Hand[p0Hand.length - 1],
+      isTsumogiri: true,
+    });
+
+    // 全員スキップ → player 1 がツモ
+    const skipActions = new Map<number, PlayerAction>();
+    skipActions.set(1, { type: ActionType.Skip, playerIndex: 1 });
+    skipActions.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    skipActions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+    resolveAfterDiscard(state, skipActions);
+
+    // player 1 がツモ（advanceToNextDraw で遷移済み）
+    expect(state.activePlayerIndex).toBe(1);
+
+    // player 1 の手牌をテンパイに差し替える（ツモした牌を含めて14枚）
+    const p1 = state.players[1];
+    while (p1.hand.getTiles().length > 0) {
+      p1.hand.removeTile(p1.hand.getTiles()[0]);
+    }
+    p1.hand.addTile(tile(TT.Man1, 500));
+    p1.hand.addTile(tile(TT.Man1, 501));
+    p1.hand.addTile(tile(TT.Man1, 502));
+    p1.hand.addTile(tile(TT.Man2, 503));
+    p1.hand.addTile(tile(TT.Man3, 504));
+    p1.hand.addTile(tile(TT.Man4, 505));
+    p1.hand.addTile(tile(TT.Man5, 506));
+    p1.hand.addTile(tile(TT.Man6, 507));
+    p1.hand.addTile(tile(TT.Man7, 508));
+    p1.hand.addTile(tile(TT.Man8, 509));
+    p1.hand.addTile(tile(TT.Man9, 510));
+    p1.hand.addTile(tile(TT.Man9, 511));
+    p1.hand.addTile(tile(TT.Man9, 512));
+    p1.hand.addTile(tile(TT.Ton, 520)); // ツモ牌（14枚目）
+
+    // player 1 が打牌（東を切る）
+    applyAction(state, {
+      type: ActionType.Discard,
+      playerIndex: 1,
+      tile: tile(TT.Ton, 520),
+      isTsumogiri: true,
+    });
+
+    // 全員スキップ → player 2 がツモ
+    const skipActions2 = new Map<number, PlayerAction>();
+    skipActions2.set(0, { type: ActionType.Skip, playerIndex: 0 });
+    skipActions2.set(2, { type: ActionType.Skip, playerIndex: 2 });
+    skipActions2.set(3, { type: ActionType.Skip, playerIndex: 3 });
+    resolveAfterDiscard(state, skipActions2);
+
+    // player 2 がツモ
+    expect(state.activePlayerIndex).toBe(2);
+
+    // player 2 の手牌に東を追加して打牌させる
+    const p2 = state.players[2];
+    const p2Hand = p2.hand.getTiles();
+    applyAction(state, {
+      type: ActionType.Discard,
+      playerIndex: 2,
+      tile: p2Hand[p2Hand.length - 1],
+      isTsumogiri: true,
+    });
+
+    // player 1 の手牌を再設定（13枚: 打牌後、白暗刻 + 萬子テンパイ）
+    while (p1.hand.getTiles().length > 0) {
+      p1.hand.removeTile(p1.hand.getTiles()[0]);
+    }
+    p1.hand.addTile(tile(TT.Haku, 550));
+    p1.hand.addTile(tile(TT.Haku, 551));
+    p1.hand.addTile(tile(TT.Haku, 552));
+    p1.hand.addTile(tile(TT.Man1, 500));
+    p1.hand.addTile(tile(TT.Man2, 503));
+    p1.hand.addTile(tile(TT.Man3, 504));
+    p1.hand.addTile(tile(TT.Man4, 505));
+    p1.hand.addTile(tile(TT.Man5, 506));
+    p1.hand.addTile(tile(TT.Man6, 507));
+    p1.hand.addTile(tile(TT.Man7, 508));
+    p1.hand.addTile(tile(TT.Man8, 509));
+    p1.hand.addTile(tile(TT.Man9, 510));
+    p1.hand.addTile(tile(TT.Man9, 511));
+
+    // player 2 の捨て牌に player 1 がロン（Man9 でロン → 白暗刻で1翻）
+    state.lastDiscardTile = tile(TT.Man9, 601);
+
+    const ronActions = new Map<number, PlayerAction>();
+    ronActions.set(0, { type: ActionType.Skip, playerIndex: 0 });
+    ronActions.set(1, { type: ActionType.Ron, playerIndex: 1 });
+    ronActions.set(3, { type: ActionType.Skip, playerIndex: 3 });
+
+    resolveAfterDiscard(state, ronActions);
+
+    expect(state.phase).toBe(RoundPhase.Completed);
+    const win = state.result!.wins[0];
+    expect(win.winnerIndex).toBe(1);
+    // 人和ではないことを確認（清一色など他の役のみ）
+    const yakuList = win.scoreResult.judgeResult.yakuList;
+    const hasRenhou = yakuList.some((y) => y.yaku === "renhou");
+    expect(hasRenhou).toBe(false);
+  });
+});
