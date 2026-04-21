@@ -1,6 +1,7 @@
 import fp from "fastify-plugin";
 import admin from "firebase-admin";
 import { createError } from "@fastify/error";
+import { config } from "../config.js";
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
@@ -15,12 +16,44 @@ let firebaseInitialized = false;
 
 function initFirebase() {
   if (firebaseInitialized) return;
-  // 開発環境では Firebase エミュレータを使う場合、
-  // FIREBASE_AUTH_EMULATOR_HOST 環境変数を設定する
-  if (!admin.apps.length) {
-    admin.initializeApp();
+  if (admin.apps.length) {
+    firebaseInitialized = true;
+    return;
   }
-  firebaseInitialized = true;
+
+  const projectId = config.firebase.projectId;
+  const credentialsJson = process.env["FIREBASE_ADMIN_CREDENTIALS_JSON"];
+  const credentialsPath = process.env["GOOGLE_APPLICATION_CREDENTIALS"];
+
+  // 本番推奨: サービスアカウント JSON をシークレット環境変数として注入
+  if (credentialsJson) {
+    try {
+      const parsed = JSON.parse(credentialsJson) as admin.ServiceAccount;
+      admin.initializeApp({
+        credential: admin.credential.cert(parsed),
+        projectId,
+      });
+      firebaseInitialized = true;
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid FIREBASE_ADMIN_CREDENTIALS_JSON: ${message}`);
+    }
+  }
+
+  // ローカル開発互換: サービスアカウント JSON ファイルパスを利用
+  if (credentialsPath) {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId,
+    });
+    firebaseInitialized = true;
+    return;
+  }
+
+  throw new Error(
+    "Firebase Admin credential is not configured. Set FIREBASE_ADMIN_CREDENTIALS_JSON (recommended) or GOOGLE_APPLICATION_CREDENTIALS.",
+  );
 }
 
 async function auth(app: FastifyInstance) {
@@ -44,7 +77,17 @@ async function auth(app: FastifyInstance) {
         const decoded = await admin.auth().verifyIdToken(token);
         request.uid = decoded.uid;
         request.firebaseUser = decoded;
-      } catch {
+      } catch (error) {
+        request.log.warn(
+          {
+            err: error,
+            code:
+              typeof error === "object" && error !== null && "code" in error
+                ? (error as { code?: string }).code
+                : undefined,
+          },
+          "Firebase ID token verification failed",
+        );
         throw createError("UNAUTHORIZED", "Invalid Firebase ID token", 401)();
       }
     },
