@@ -12,6 +12,7 @@ interface GameBoardProps {
   riichiSticks: number;
   remainingTiles: number;
   doraIndicators: readonly TileData[];
+  playerNames?: readonly string[];
   currentPlayer: number;
   dealerIndex?: number;
   selectedTileIndex?: number;
@@ -27,6 +28,7 @@ export function GameBoard({
   riichiSticks,
   remainingTiles,
   doraIndicators,
+  playerNames,
   currentPlayer,
   dealerIndex,
   selectedTileIndex,
@@ -81,6 +83,7 @@ export function GameBoard({
               remainingTiles={remainingTiles}
               doraIndicators={doraIndicators}
               scores={players.map((p) => p.score)}
+              playerNames={playerNames}
               currentPlayer={currentPlayer}
               dealerIndex={dealerIndex}
             />

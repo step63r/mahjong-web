@@ -5,6 +5,7 @@ import { ActionButtons } from "@/components/action/ActionButtons";
 import { RoundResultOverlay } from "@/components/overlay/RoundResultOverlay";
 import { DebugPanel } from "@/components/debug/DebugPanel";
 import { useGameStore } from "@/stores/gameStore";
+import { useAuthStore } from "@/stores/authStore";
 import { buildPlayerViews, buildActionOptions, getRiichiCandidateTileTypes, computeWaitingTiles } from "@/utils/viewConverter";
 import { ActionType, RoundEndReason, createDefaultRuleConfig } from "@mahjong-web/domain";
 import type { RuleConfig } from "@mahjong-web/domain";
@@ -37,6 +38,7 @@ export function GamePage() {
     setDebugTargetPlayer,
     performDebugSwap,
   } = useGameStore();
+  const { status: authStatus, profile } = useAuthStore();
 
   // ゲーム開始
   useEffect(() => {
@@ -209,6 +211,10 @@ export function GamePage() {
   }
 
   const playerViews = buildPlayerViews(roundState, 0, debugMode, revealedPlayers);
+  const selfPlayerName = authStatus === "authenticated"
+    ? (profile?.displayName ?? "ゲスト")
+    : "ゲスト";
+  const playerNames = [selfPlayerName, "CPU", "CPU", "CPU"] as const;
   const actionOptions = buildActionOptions(availableActions);
   const doraIndicators: TileData[] = roundState.wall.getDoraIndicators().map((t) => ({
     type: t.type,
@@ -228,6 +234,7 @@ export function GamePage() {
         riichiSticks={roundState.riichiSticks}
         remainingTiles={roundState.wall.remainingDrawCount}
         doraIndicators={doraIndicators}
+        playerNames={playerNames}
         currentPlayer={roundState.activePlayerIndex}
         dealerIndex={roundState.dealerIndex}
         initialDealerIndex={gameState.initialDealerIndex}

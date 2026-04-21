@@ -28,6 +28,7 @@ export interface PixiInfoPanelProps {
   remainingTiles: number;
   doraIndicators: readonly TileData[];
   scores: readonly number[];
+  playerNames?: readonly string[];
   currentPlayer: number;
   dealerIndex?: number;
 }
@@ -43,6 +44,7 @@ export function PixiInfoPanel({
   remainingTiles,
   doraIndicators,
   scores,
+  playerNames,
   currentPlayer,
   dealerIndex,
 }: PixiInfoPanelProps) {
@@ -65,15 +67,16 @@ export function PixiInfoPanel({
       >
         <span
           className={
-            isCurrent ? "text-yellow-300 font-bold" : "text-gray-200"
+            `${isCurrent ? "text-yellow-300 font-bold" : "text-gray-200"} min-w-0 overflow-hidden text-ellipsis`
           }
         >
-          {SEAT_WINDS[windIdx]}
+          {SEAT_WINDS[windIdx]} - {playerNames?.[idx] ?? ""}
         </span>
         <span
           className={
-            isCurrent ? "text-yellow-300 font-bold" : "text-white"
+            `${isCurrent ? "text-yellow-300 font-bold" : "text-white"} shrink-0`
           }
+          style={{ marginLeft: 5 }}
         >
           {scores[idx]?.toLocaleString()}
         </span>

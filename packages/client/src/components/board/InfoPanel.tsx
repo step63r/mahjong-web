@@ -11,8 +11,11 @@ interface InfoPanelProps {
   scores: readonly number[];
   currentPlayer: number;
   dealerIndex?: number;
+  playerNames?: readonly string[];
   seatLabels?: readonly string[];
 }
+
+const SEAT_WINDS = ["東", "南", "西", "北"] as const;
 
 const WIND_LABELS: Record<string, string> = {
   ton: "東",
@@ -31,6 +34,7 @@ export function InfoPanel({
   scores,
   currentPlayer,
   dealerIndex,
+  playerNames,
   seatLabels = ["自家", "下家", "対面", "上家"],
 }: InfoPanelProps) {
   const windLabel = WIND_LABELS[roundWind] ?? roundWind;
@@ -68,11 +72,13 @@ export function InfoPanel({
               i === currentPlayer ? "text-yellow-300 font-bold" : "text-gray-300"
             }`}
           >
-            <span>
-              {seatLabels[i]}
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {SEAT_WINDS[i]} - {playerNames?.[i] ?? seatLabels[i]}
               {dealerIndex === i && "(親)"}
             </span>
-            <span>{score.toLocaleString()}点</span>
+            <span className="shrink-0" style={{ marginLeft: 5 }}>
+              {score.toLocaleString()}点
+            </span>
           </div>
         ))}
       </div>

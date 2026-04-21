@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { TopPage } from "@/pages/TopPage";
 import { RuleSettingsPage } from "@/pages/RuleSettingsPage";
@@ -6,8 +7,15 @@ import { ResultPage } from "@/pages/ResultPage";
 import { LobbyPage } from "@/pages/LobbyPage";
 import { RoomPage } from "@/pages/RoomPage";
 import { OnlineGamePage } from "@/pages/OnlineGamePage";
+import { useAuthStore } from "./stores/authStore";
 
 export function App() {
+  const initialize = useAuthStore((s) => s.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   return (
     <BrowserRouter>
       <Routes>

@@ -197,6 +197,12 @@ export function OnlineGamePage() {
   const relativeCurrentPlayer = toRelative(latestView.activePlayerIndex);
   const relativeDealer = toRelative(latestView.dealerIndex);
   const relativeInitialDealer = toRelative(latestView.initialDealerIndex);
+  const playerNames = ["", "", "", ""];
+  playerNames[0] = latestView.self.playerName || "ゲスト";
+  for (const opp of latestView.opponents) {
+    const rel = toRelative(opp.seatIndex);
+    playerNames[rel] = opp.playerName || "ゲスト";
+  }
 
   return (
     <>
@@ -208,6 +214,7 @@ export function OnlineGamePage() {
         riichiSticks={latestView.riichiSticks}
         remainingTiles={latestView.remainingTiles}
         doraIndicators={doraIndicators}
+        playerNames={playerNames}
         currentPlayer={relativeCurrentPlayer}
         dealerIndex={relativeDealer}
         initialDealerIndex={relativeInitialDealer}

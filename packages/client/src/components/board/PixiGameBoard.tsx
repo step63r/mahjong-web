@@ -27,6 +27,7 @@ export interface PixiGameBoardProps {
   riichiSticks: number;
   remainingTiles: number;
   doraIndicators: readonly TileData[];
+  playerNames?: readonly string[];
   currentPlayer: number;
   /** 現在の東家（親）のインデックス */
   dealerIndex?: number;
@@ -244,6 +245,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
               remainingTiles={props.remainingTiles}
               doraIndicators={props.doraIndicators}
               scores={props.players.map((p) => p.score)}
+              playerNames={props.playerNames}
               currentPlayer={props.currentPlayer}
               dealerIndex={props.dealerIndex}
             />
