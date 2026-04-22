@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { TopPage } from "@/pages/TopPage";
+import { MenuPage } from "@/pages/MenuPage";
 import { RuleSettingsPage } from "@/pages/RuleSettingsPage";
 import { GamePage } from "@/pages/GamePage";
 import { ResultPage } from "@/pages/ResultPage";
@@ -20,6 +21,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<TopPage />} />
+        <Route path="/menu" element={<MenuPage />} />
         <Route path="/rule-settings" element={<RuleSettingsPage />} />
         <Route path="/game" element={<GamePage />} />
         <Route path="/result" element={<ResultPage />} />
