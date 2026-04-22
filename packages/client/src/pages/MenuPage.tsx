@@ -11,9 +11,11 @@ export function MenuPage() {
   const isAuthenticated = status === "authenticated";
 
   return (
-    <div className="min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
+    <div className="relative min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
       <h1 className="text-4xl font-bold text-white tracking-wider">メニュー</h1>
-      <p className="text-emerald-300 text-lg">{userLabel}でプレイ中</p>
+      {!isAuthenticated ? null : (
+        <p className="text-emerald-300 text-lg">{userLabel}でプレイ中</p>
+      )}
 
       <div className="flex flex-col gap-4 w-72">
         <button
@@ -48,6 +50,10 @@ export function MenuPage() {
       ) : (
         <p className="text-emerald-400/70 text-sm mt-8">ゲストでプレイ中</p>
       )}
+
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-emerald-400/70 text-xs">
+        © 2026 minato project
+      </p>
     </div>
   );
 }

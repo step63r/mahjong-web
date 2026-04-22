@@ -20,7 +20,7 @@ export function TopPage() {
   };
 
   return (
-    <div className="min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
+    <div className="relative min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
       <h1 className="text-5xl font-bold text-white tracking-wider">麻雀 Web</h1>
       <p className="text-emerald-300 text-lg">ブラウザで遊べる4人打ち麻雀</p>
 
@@ -51,6 +51,10 @@ export function TopPage() {
         </div>
         {error ? <p className="text-rose-300 text-xs mt-2">{error}</p> : null}
       </div>
+
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-emerald-400/70 text-xs">
+        © 2026 minato project
+      </p>
     </div>
   );
 }
