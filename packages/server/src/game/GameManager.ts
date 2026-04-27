@@ -5,6 +5,7 @@
  * ドメインエンジンを駆動してゲームを進行させる。
  */
 import type { Server } from "socket.io";
+import type { PrismaClient } from "@prisma/client";
 import {
   createGame,
   startGame,
@@ -76,6 +77,10 @@ export interface ActiveRoom {
   actionTimers: Map<number, ReturnType<typeof setTimeout>>;
   /** 全体アクションタイムアウト（秒） */
   actionTimeout: number;
+  /** 永続化した games.id */
+  dbGameId: string | null;
+  /** seatIndex -> game_players.id */
+  dbGamePlayerIds: Map<number, string>;
 }
 
 // ===== GameManager =====
@@ -88,7 +93,10 @@ export class GameManager {
   /** userId → roomId（再接続用） */
   private userToRoom = new Map<string, string>();
 
-  constructor(private io: Server) {}
+  constructor(
+    private io: Server,
+    private prisma: PrismaClient,
+  ) {}
 
   /** 6桁のルームIDを生成 */
   generateRoomId(): string {
@@ -134,6 +142,8 @@ export class GameManager {
       pendingPlayerActions: new Map(),
       actionTimers: new Map(),
       actionTimeout: 30,
+      dbGameId: null,
+      dbGamePlayerIds: new Map(),
     };
     this.rooms.set(roomId, room);
     this.socketToRoom.set(hostPlayer.socketId, roomId);
@@ -244,7 +254,7 @@ export class GameManager {
 
   // ========== ゲーム開始 ==========
 
-  startGame(roomId: string): boolean {
+  async startGame(roomId: string): Promise<boolean> {
     const room = this.rooms.get(roomId);
     if (!room || room.status !== "waiting" || room.players.length !== 4) return false;
 
@@ -253,8 +263,135 @@ export class GameManager {
     const game = startGame(createGame(room.ruleConfig));
     room.gameState = game;
 
+    try {
+      await this.ensurePersistedOnlineGame(room);
+    } catch (error) {
+      console.error("Failed to persist online game start", error);
+    }
+
     this.startNewRound(room);
     return true;
+  }
+
+  private async ensurePersistedOnlineGame(room: ActiveRoom): Promise<void> {
+    if (room.dbGameId) return;
+
+    const rawUserIds = room.players
+      .map((p) => p.userId)
+      .filter((value): value is string => Boolean(value));
+
+    const resolvedUserIds = new Map<string, string>();
+    if (rawUserIds.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: {
+          OR: [{ id: { in: rawUserIds } }, { firebaseUid: { in: rawUserIds } }],
+        },
+      });
+
+      for (const user of users) {
+        resolvedUserIds.set(user.id, user.id);
+        resolvedUserIds.set(user.firebaseUid, user.id);
+      }
+    }
+
+    const game = await this.prisma.game.create({
+      data: {
+        gameType: `online_${room.gameType}`,
+        status: "playing",
+        ruleConfig: JSON.stringify(room.ruleConfig),
+        gamePlayers: {
+          create: room.players.map((player) => ({
+            seatIndex: player.seatIndex,
+            playerName: player.playerName,
+            userId: player.userId ? (resolvedUserIds.get(player.userId) ?? null) : null,
+          })),
+        },
+      },
+      include: {
+        gamePlayers: true,
+      },
+    });
+
+    room.dbGameId = game.id;
+    room.dbGamePlayerIds = new Map(game.gamePlayers.map((p) => [p.seatIndex, p.id]));
+  }
+
+  private async persistRoundResult(
+    room: ActiveRoom,
+    round: RoundState,
+    result: import("@mahjong-web/domain").RoundResult,
+    roundWind: string,
+    roundNumber: number,
+  ): Promise<void> {
+    if (!room.dbGameId) return;
+
+    const roundWindValue = roundWind === "nan" ? 1 : 0;
+
+    const createdRound = await this.prisma.round.create({
+      data: {
+        gameId: room.dbGameId,
+        roundWind: roundWindValue,
+        roundNumber: Math.max(0, roundNumber - 1),
+        honba: round.honba,
+        resultType: result.reason,
+      },
+    });
+
+    await this.prisma.roundPlayerStat.createMany({
+      data: room.players.map((player) => {
+        const gamePlayerId = room.dbGamePlayerIds.get(player.seatIndex);
+        if (!gamePlayerId) {
+          throw new Error(`Missing gamePlayerId for seatIndex=${player.seatIndex}`);
+        }
+
+        const win = result.wins.find((w) => w.winnerIndex === player.seatIndex);
+        return {
+          roundId: createdRound.id,
+          gamePlayerId,
+          isWinner: win !== undefined,
+          isLoser: result.wins.some((w) => w.loserIndex === player.seatIndex),
+          scoreDelta: result.scoreChanges[player.seatIndex],
+          yakuList:
+            win !== undefined
+              ? JSON.stringify(
+                  win.scoreResult.judgeResult.yakuList.map((yaku) => ({
+                    name: yaku.yaku,
+                    han: yaku.han,
+                  })),
+                )
+              : null,
+          han: win?.scoreResult.totalHan,
+          fu: win?.scoreResult.totalFu,
+        };
+      }),
+    });
+  }
+
+  private async persistGameFinished(room: ActiveRoom, gameResult: GameResult): Promise<void> {
+    if (!room.dbGameId) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.game.update({
+        where: { id: room.dbGameId! },
+        data: {
+          status: "finished",
+          finishedAt: new Date(),
+        },
+      });
+
+      for (const player of room.players) {
+        const gamePlayerId = room.dbGamePlayerIds.get(player.seatIndex);
+        if (!gamePlayerId) continue;
+
+        await tx.gamePlayer.update({
+          where: { id: gamePlayerId },
+          data: {
+            finalScore: gameResult.finalScores[player.seatIndex],
+            finalRank: gameResult.rankings[player.seatIndex],
+          },
+        });
+      }
+    });
   }
 
   private startNewRound(room: ActiveRoom): void {
@@ -556,8 +693,20 @@ export class GameManager {
     const round = room.roundState!;
     const game = room.gameState!;
     const result = round.result!;
+    const completedRoundWind = game.currentRound.roundWind;
+    const completedRoundNumber = game.currentRound.roundNumber;
 
     processRoundResult(game, result);
+
+    void this.persistRoundResult(
+      room,
+      round,
+      result,
+      completedRoundWind,
+      completedRoundNumber,
+    ).catch((error) => {
+      console.error("Failed to persist online round result", error);
+    });
 
     // 結果を送信
     const resultDto = this.toRoundResultDto(result);
@@ -573,6 +722,9 @@ export class GameManager {
       const gameResult = calculateFinalResult(game);
       room.gameResult = gameResult;
       room.status = "finished";
+      void this.persistGameFinished(room, gameResult).catch((error) => {
+        console.error("Failed to persist online game result", error);
+      });
       const gameResultDto = this.toGameResultDto(room, gameResult);
       for (const p of room.players) {
         if (!p.socketId || !p.isConnected) continue;

@@ -119,7 +119,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, gameManager: G
   });
 
   // ゲーム開始（ホストのみ）
-  socket.on("room:startGame", () => {
+  socket.on("room:startGame", async () => {
     const roomId = socket.data["roomId"] as string | undefined;
     if (!roomId) return;
 
@@ -138,7 +138,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, gameManager: G
       return;
     }
 
-    const success = gameManager.startGame(roomId);
+    const success = await gameManager.startGame(roomId);
     if (success) {
       io.to(roomId).emit("game:started", { roomId });
     }

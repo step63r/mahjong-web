@@ -64,7 +64,7 @@ export async function buildApp() {
   // --- Socket.IO ハンドラ登録 ---
   // GameManager は ready 後に io が利用可能になってから初期化する
   app.ready().then(() => {
-    const gameManager = new GameManager(app.io);
+    const gameManager = new GameManager(app.io, app.prisma);
     // decorate は ready 前に行えないため、プロパティとして直接設定
     (app as unknown as Record<string, unknown>)["gameManager"] = gameManager;
     registerSocketHandlers(app.io, gameManager);
