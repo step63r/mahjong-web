@@ -8,6 +8,7 @@ import { ResultPage } from "@/pages/ResultPage";
 import { LobbyPage } from "@/pages/LobbyPage";
 import { RoomPage } from "@/pages/RoomPage";
 import { OnlineGamePage } from "@/pages/OnlineGamePage";
+import { StatsPage } from "@/pages/StatsPage";
 import { useAuthStore } from "./stores/authStore";
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
         <Route path="/lobby" element={<LobbyPage />} />
         <Route path="/room" element={<RoomPage />} />
         <Route path="/online-game" element={<OnlineGamePage />} />
+        <Route path="/stats" element={<StatsPage />} />
       </Routes>
     </BrowserRouter>
   );

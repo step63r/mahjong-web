@@ -32,10 +32,10 @@ export function MenuPage() {
         </button>
         {isAuthenticated ? (
           <button
-            disabled
-            className="bg-emerald-700/60 text-emerald-100/70 font-bold py-4 px-8 rounded-xl text-xl cursor-not-allowed"
+            onClick={() => navigate("/stats")}
+            className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors"
           >
-            戦績閲覧（準備中）
+            戦績閲覧
           </button>
         ) : null}
       </div>
