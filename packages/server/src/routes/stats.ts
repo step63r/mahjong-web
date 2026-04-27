@@ -88,6 +88,10 @@ const saveCpuGameSchema = z
     });
   });
 
+const statsSummaryQuerySchema = z.object({
+  gameType: z.enum(["cpu", "online"]).optional(),
+});
+
 export async function statsRoutes(app: FastifyInstance) {
   // POST /api/stats/games/cpu — CPU戦の戦績を保存
   app.post(
@@ -182,6 +186,8 @@ export async function statsRoutes(app: FastifyInstance) {
     "/me",
     { preHandler: [app.authenticate] },
     async (request, reply) => {
+      const query = statsSummaryQuerySchema.parse(request.query);
+
       const user = await app.prisma.user.findUnique({
         where: { firebaseUid: request.uid! },
       });
@@ -190,19 +196,39 @@ export async function statsRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: "User not found" });
       }
 
-      // 直近の対局一覧（最大20件）
-      const recentGames = await app.prisma.gamePlayer.findMany({
-        where: { userId: user.id, finalRank: { not: null } },
-        orderBy: { game: { finishedAt: "desc" } },
-        take: 20,
+      const gameTypeFilter =
+        query.gameType === "cpu"
+          ? ({ startsWith: "cpu_" } as const)
+          : query.gameType === "online"
+            ? ({ startsWith: "online_" } as const)
+            : undefined;
+
+      const gamePlayerWhere = {
+        userId: user.id,
+        finalRank: { not: null },
+        ...(gameTypeFilter ? { game: { gameType: gameTypeFilter } } : {}),
+      };
+
+      // 全期間の対局一覧（平均値などに使用）
+      const allGames = await app.prisma.gamePlayer.findMany({
+        where: gamePlayerWhere,
         include: { game: true },
       });
+
+      // 直近10試合の順位（グラフ用）
+      const recentGamesDesc = await app.prisma.gamePlayer.findMany({
+        where: gamePlayerWhere,
+        orderBy: { game: { finishedAt: "desc" } },
+        take: 10,
+        include: { game: true },
+      });
+      const recentGames = [...recentGamesDesc].reverse();
 
       // 順位の集計
       const rankCounts = [0, 0, 0, 0]; // 1位, 2位, 3位, 4位
       let totalScore = 0;
 
-      for (const gp of recentGames) {
+      for (const gp of allGames) {
         if (gp.finalRank != null) {
           rankCounts[gp.finalRank - 1]++;
         }
@@ -211,35 +237,124 @@ export async function statsRoutes(app: FastifyInstance) {
         }
       }
 
-      const totalGames = recentGames.length;
+      const totalGames = allGames.length;
       const averageRank =
         totalGames > 0
-          ? recentGames.reduce((sum, gp) => sum + (gp.finalRank ?? 0), 0) / totalGames
+          ? allGames.reduce((sum, gp) => sum + (gp.finalRank ?? 0), 0) / totalGames
           : 0;
 
       // 和了/放銃の統計
       const roundStats = await app.prisma.roundPlayerStat.findMany({
         where: {
-          gamePlayer: { userId: user.id },
+          gamePlayer: {
+            userId: user.id,
+            ...(gameTypeFilter ? { game: { gameType: gameTypeFilter } } : {}),
+          },
+        },
+        select: {
+          roundId: true,
+          isWinner: true,
+          isLoser: true,
+          scoreDelta: true,
+          yakuList: true,
+          han: true,
         },
       });
 
       const wins = roundStats.filter((s) => s.isWinner);
       const losses = roundStats.filter((s) => s.isLoser);
 
+      const averageWinScore =
+        wins.length > 0
+          ? Math.round(wins.reduce((sum, stat) => sum + stat.scoreDelta, 0) / wins.length)
+          : 0;
+
+      const averageWinHan =
+        wins.length > 0
+          ? Math.round((wins.reduce((sum, stat) => sum + (stat.han ?? 0), 0) / wins.length) * 100) /
+            100
+          : 0;
+
+      // 放銃打点は見やすさのため正値（失点の絶対値）で返す
+      const averageLossScore =
+        losses.length > 0
+          ? Math.round(
+              losses.reduce((sum, stat) => sum + Math.abs(stat.scoreDelta), 0) /
+                losses.length,
+            )
+          : 0;
+
+      // 放銃時の飜数は、同じ roundId の勝者ハンド飜数から推定
+      const winnerHanByRound = new Map<string, number[]>();
+      for (const win of wins) {
+        if (win.han == null) continue;
+        const list = winnerHanByRound.get(win.roundId) ?? [];
+        list.push(win.han);
+        winnerHanByRound.set(win.roundId, list);
+      }
+
+      const lossHans: number[] = [];
+      for (const loss of losses) {
+        const winnerHans = winnerHanByRound.get(loss.roundId);
+        if (!winnerHans || winnerHans.length === 0) continue;
+        const avgHanInRound =
+          winnerHans.reduce((sum, han) => sum + han, 0) / winnerHans.length;
+        lossHans.push(avgHanInRound);
+      }
+
+      const averageLossHan =
+        lossHans.length > 0
+          ? Math.round(
+              (lossHans.reduce((sum, han) => sum + han, 0) / lossHans.length) * 100,
+            ) / 100
+          : 0;
+
+      const yakuCounts = new Map<string, number>();
+      for (const win of wins) {
+        if (!win.yakuList) continue;
+        try {
+          const parsed = JSON.parse(win.yakuList) as unknown;
+          if (!Array.isArray(parsed)) continue;
+
+          for (const entry of parsed) {
+            if (typeof entry !== "object" || entry === null) continue;
+            const record = entry as Record<string, unknown>;
+            const rawName =
+              typeof record["name"] === "string"
+                ? record["name"]
+                : typeof record["yaku"] === "string"
+                  ? record["yaku"]
+                  : null;
+            if (!rawName) continue;
+            yakuCounts.set(rawName, (yakuCounts.get(rawName) ?? 0) + 1);
+          }
+        } catch {
+          // 破損データは集計から除外
+        }
+      }
+
       return reply.send({
+        gameType: query.gameType ?? "all",
         totalGames,
         rankCounts,
         averageRank: Math.round(averageRank * 100) / 100,
         totalScore,
+        recentRanks: recentGames.map((gp, index) => ({
+          order: index + 1,
+          gameId: gp.gameId,
+          finishedAt: gp.game.finishedAt,
+          rank: gp.finalRank,
+        })),
         winCount: wins.length,
         lossCount: losses.length,
-        averageWinHan:
-          wins.length > 0
-            ? Math.round(
-                (wins.reduce((s, w) => s + (w.han ?? 0), 0) / wins.length) * 100,
-              ) / 100
-            : 0,
+        averageWinScore,
+        averageWinHan,
+        averageLossScore,
+        averageLossHan,
+        yakuStats: Array.from(yakuCounts.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count),
+        // 既存クライアント互換のため残す（負値）
         averageLossScoreDelta:
           losses.length > 0
             ? Math.round(
