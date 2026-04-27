@@ -8,8 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LabelList,
 } from "recharts";
+import { Yaku } from "@mahjong-web/domain";
 import { getStatsSummary, type StatsSummaryDto } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -19,6 +19,59 @@ interface ChartPoint {
   x: number;
   label: string;
   rank: number | null;
+}
+
+const YAKU_NAMES: Record<string, string> = {
+  [Yaku.Riichi]: "リーチ",
+  [Yaku.Ippatsu]: "一発",
+  [Yaku.MenzenTsumo]: "門前清自摸和",
+  [Yaku.Tanyao]: "断么九",
+  [Yaku.Pinfu]: "平和",
+  [Yaku.Iipeiko]: "一盃口",
+  [Yaku.YakuhaiRoundWind]: "場風",
+  [Yaku.YakuhaiSeatWind]: "自風",
+  [Yaku.YakuhaiHaku]: "白",
+  [Yaku.YakuhaiHatsu]: "發",
+  [Yaku.YakuhaiChun]: "中",
+  [Yaku.Haitei]: "海底摸月",
+  [Yaku.Houtei]: "河底撈魚",
+  [Yaku.Rinshan]: "嶺上開花",
+  [Yaku.Chankan]: "搶槓",
+  [Yaku.DoubleRiichi]: "ダブルリーチ",
+  [Yaku.Chiitoitsu]: "七対子",
+  [Yaku.Toitoi]: "対々和",
+  [Yaku.Sanankou]: "三暗刻",
+  [Yaku.SanshokuDoukou]: "三色同刻",
+  [Yaku.SanshokuDoujun]: "三色同順",
+  [Yaku.Ikkitsuukan]: "一気通貫",
+  [Yaku.Chanta]: "混全帯么九",
+  [Yaku.Sankantsu]: "三槓子",
+  [Yaku.Shousangen]: "小三元",
+  [Yaku.Honroutou]: "混老頭",
+  [Yaku.Ryanpeiko]: "二盃口",
+  [Yaku.Junchan]: "純全帯么九",
+  [Yaku.Honitsu]: "混一色",
+  [Yaku.Chinitsu]: "清一色",
+  [Yaku.Tenhou]: "天和",
+  [Yaku.Chiihou]: "地和",
+  [Yaku.Kokushi]: "国士無双",
+  [Yaku.KokushiJuusanmen]: "国士無双十三面待ち",
+  [Yaku.Suuankou]: "四暗刻",
+  [Yaku.SuuankouTanki]: "四暗刻単騎待ち",
+  [Yaku.Daisangen]: "大三元",
+  [Yaku.Tsuuiisou]: "字一色",
+  [Yaku.Ryuuiisou]: "緑一色",
+  [Yaku.Shousuushii]: "小四喜",
+  [Yaku.Daisuushii]: "大四喜",
+  [Yaku.Chinroutou]: "清老頭",
+  [Yaku.ChuurenPoutou]: "九蓮宝燈",
+  [Yaku.JunseiChuuren]: "純正九蓮宝燈",
+  [Yaku.Suukantsu]: "四槓子",
+  [Yaku.Renhou]: "人和",
+};
+
+function toYakuLabel(name: string): string {
+  return YAKU_NAMES[name] ?? name;
 }
 
 function toChartData(recentRanks: StatsSummaryDto["recentRanks"]): ChartPoint[] {
@@ -135,20 +188,22 @@ export function StatsPage() {
               <h2 className="text-xl font-bold mb-4">直近の戦績（最大10試合）</h2>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                  <LineChart data={chartData} margin={{ top: 24, right: 36, left: 20, bottom: 24 }}>
                     <CartesianGrid strokeDasharray="4 4" stroke="#2d6a4f" />
                     <XAxis
                       dataKey="x"
                       type="number"
-                      domain={[0, 10]}
+                      domain={[1, 10]}
                       ticks={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                      tickMargin={10}
                       tickFormatter={(value) => chartData.find((d) => d.x === value)?.label ?? ""}
                       stroke="#a7f3d0"
                     />
                     <YAxis
                       type="number"
-                      domain={[5, 1]}
-                      ticks={[4, 3, 2, 1]}
+                      domain={[1, 4]}
+                      reversed
+                      ticks={[1, 2, 3, 4]}
                       tickFormatter={(value) => `${value}位`}
                       stroke="#a7f3d0"
                     />
@@ -160,7 +215,7 @@ export function StatsPage() {
                       }}
                       formatter={(value: unknown) => {
                         const num = typeof value === "number" ? value : null;
-                        return num == null ? "データなし" : `${num}位`;
+                        return [num == null ? "データなし" : `${num}位`, "順位"];
                       }}
                       labelFormatter={(value) =>
                         chartData.find((d) => d.x === value)?.label ?? ""
@@ -174,17 +229,7 @@ export function StatsPage() {
                       connectNulls={false}
                       dot={{ fill: "#ffffff", r: 4 }}
                       activeDot={{ r: 6 }}
-                    >
-                      <LabelList
-                        dataKey="rank"
-                        position="top"
-                        formatter={(value: unknown) => {
-                          const num = typeof value === "number" ? value : null;
-                          return num == null ? "" : `${num}`;
-                        }}
-                        fill="#e5e7eb"
-                      />
-                    </Line>
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -227,7 +272,7 @@ export function StatsPage() {
                     <tbody>
                       {stats.yakuStats.map((yaku) => (
                         <tr key={yaku.name} className="border-b border-emerald-800/60">
-                          <td className="py-2 pr-4">{yaku.name}</td>
+                          <td className="py-2 pr-4">{toYakuLabel(yaku.name)}</td>
                           <td className="py-2 text-right font-semibold">{yaku.count}</td>
                         </tr>
                       ))}
