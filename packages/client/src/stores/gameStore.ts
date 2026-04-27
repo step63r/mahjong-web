@@ -28,7 +28,10 @@ import {
   GamePhase,
   ActionType,
   BasicAiPlayer,
+  GameLength,
 } from "@mahjong-web/domain";
+import { saveCpuGame } from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
 
 // ===== UI phases =====
 
@@ -56,6 +59,7 @@ export interface GameStore {
   debugSelectedWallTileKey: string | undefined;
   debugSelectedHandTileKey: string | undefined;
   debugTargetPlayer: number;
+  cpuGameSaved: boolean;
 
   // actions
   startCpuGame: (ruleConfig: RuleConfig) => void;
@@ -73,6 +77,58 @@ export interface GameStore {
 const AI = new BasicAiPlayer();
 function skipAction(playerIndex: number): SkipAction {
   return { type: ActionType.Skip, playerIndex };
+}
+
+async function saveCpuGameResult(
+  gameState: DomainGameState,
+  gameResult: GameResult,
+  humanPlayerIndex: number,
+): Promise<void> {
+  const auth = useAuthStore.getState();
+  if (auth.status !== "authenticated" || !auth.profile) {
+    return;
+  }
+
+  const gameType =
+    gameState.ruleConfig.gameLength === GameLength.Tonpu ? "cpu_tonpu" : "cpu_hanchan";
+
+  const players = [0, 1, 2, 3].map((seatIndex) => ({
+    seatIndex,
+    playerName:
+      seatIndex === humanPlayerIndex ? auth.profile!.displayName : `CPU${seatIndex + 1}`,
+    finalScore: gameResult.finalScores[seatIndex],
+    finalRank: gameResult.rankings[seatIndex],
+  }));
+
+  const rounds = gameState.roundHistory.map((entry) => ({
+    roundWind: entry.roundIndex.roundWind === "nan" ? 1 : 0,
+    roundNumber: entry.roundIndex.roundNumber,
+    honba: entry.honba,
+    resultType: entry.result.reason,
+    stats: [0, 1, 2, 3].map((seatIndex) => {
+      const win = entry.result.wins.find((w) => w.winnerIndex === seatIndex);
+      return {
+        seatIndex,
+        isWinner: win !== undefined,
+        isLoser: entry.result.wins.some((w) => w.loserIndex === seatIndex),
+        scoreDelta: entry.result.scoreChanges[seatIndex],
+        yakuList: win
+          ? win.scoreResult.judgeResult.yakuList.map((y) => ({ name: y.yaku, han: y.han }))
+          : undefined,
+        han: win?.scoreResult.totalHan,
+        fu: win?.scoreResult.totalFu,
+      };
+    }),
+  }));
+
+  await saveCpuGame({
+    gameType,
+    ruleConfig: gameState.ruleConfig as unknown as Record<string, unknown>,
+    selfSeatIndex: humanPlayerIndex,
+    finishedAt: new Date().toISOString(),
+    players,
+    rounds,
+  });
 }
 
 // ===== Helper: determine human's available actions in DrawPhase =====
@@ -196,6 +252,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   debugSelectedWallTileKey: undefined,
   debugSelectedHandTileKey: undefined,
   debugTargetPlayer: 0,
+  cpuGameSaved: false,
 
   startCpuGame: (ruleConfig) => {
     // Strict Mode の二重実行によるゲームループ重複を防止
@@ -223,6 +280,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameResult: null,
       availableActions: [],
       selectedTileIndex: undefined,
+      cpuGameSaved: false,
     });
 
     // Kick off the game loop
@@ -261,12 +319,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   nextRound: () => {
-    const { gameState } = get();
+    const { gameState, humanPlayerIndex, cpuGameSaved } = get();
     if (!gameState) return;
 
     if (gameState.phase === GamePhase.Finished) {
       const result = calculateFinalResult(gameState);
       set({ uiPhase: "gameResult", gameResult: result });
+
+      if (!cpuGameSaved) {
+        set({ cpuGameSaved: true });
+        void saveCpuGameResult(gameState, result, humanPlayerIndex).catch((error) => {
+          console.error("Failed to save CPU game result", error);
+          set({ cpuGameSaved: false });
+        });
+      }
       return;
     }
 
@@ -301,6 +367,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameResult: null,
       availableActions: [],
       selectedTileIndex: undefined,
+      cpuGameSaved: false,
     });
   },
 
