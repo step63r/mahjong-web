@@ -223,3 +223,40 @@ export interface CreateRoomRequest {
 export interface JoinRoomRequest {
   playerName: string;
 }
+
+// === 牌譜再生用イベント型 ===
+
+/** 牌譜再生イベント（1アクション/ツモ/打牌） */
+export interface ReplayEventDto {
+  type: string; // "initial_hand" | "draw" | "discard" | "chi" | "pon" | "ankan" | "minkan" | "kakan" | "riichi" | "win" | "exhaustive_draw" | "kyuushu_kyuuhai" | ...
+  playerIndex: number;
+  tile?: TileDto;
+  isTsumogiri?: boolean;
+  fromPlayerIndex?: number;
+  ownTiles?: TileDto[];
+  yakuList?: Array<{ name: string; han: number }>;
+  totalHan?: number;
+  totalFu?: number;
+  loserIndex?: number;
+  tenpaiPlayers?: boolean[];
+}
+
+/** 局ごとのイベントログデータ */
+export interface RoundEventDataDto {
+  version: number; // スキーマバージョン
+  roundWind: string; // "ton" | "nan" | "sha" | "pei"
+  roundNumber: number; // 1-4
+  dealerIndex: number; // 親の座席インデックス
+  honba: number;
+  riichiSticks: number;
+  initialHands: [TileDto[], TileDto[], TileDto[], TileDto[]]; // 各プレイヤーの初期手牌（座席順）
+  events: ReplayEventDto[];
+}
+
+/** RoundEventから取得するDTO */
+export interface RoundEventDto {
+  id: string;
+  roundId: string;
+  eventData: RoundEventDataDto;
+  createdAt: string;
+}

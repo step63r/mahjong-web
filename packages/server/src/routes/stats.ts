@@ -110,7 +110,7 @@ export async function statsRoutes(app: FastifyInstance) {
 
       const finishedAt = body.finishedAt ? new Date(body.finishedAt) : new Date();
 
-      const created = await app.prisma.$transaction(async (tx) => {
+      const created = await app.prisma.$transaction(async (tx: Parameters<typeof app.prisma.$transaction>[0]) => {
         const game = await tx.game.create({
           data: {
             gameType: body.gameType,
@@ -133,7 +133,7 @@ export async function statsRoutes(app: FastifyInstance) {
         });
 
         const gamePlayerIdBySeat = new Map(
-          game.gamePlayers.map((player) => [player.seatIndex, player.id]),
+          game.gamePlayers.map((player: typeof game.gamePlayers[0]) => [player.seatIndex, player.id]),
         );
 
         for (const round of body.rounds) {
@@ -166,6 +166,16 @@ export async function statsRoutes(app: FastifyInstance) {
               };
             }),
           });
+
+          // Step2: roundEventsデータがあれば RoundEvent を作成
+          // if (body.roundEvents?.[round.roundNumber - 1]) {
+          //   await tx.roundEvent.create({
+          //     data: {
+          //       roundId: createdRound.id,
+          //       eventData: JSON.stringify(body.roundEvents[round.roundNumber - 1]),
+          //     },
+          //   });
+          // }
         }
 
         return {
@@ -240,7 +250,7 @@ export async function statsRoutes(app: FastifyInstance) {
       const totalGames = allGames.length;
       const averageRank =
         totalGames > 0
-          ? allGames.reduce((sum, gp) => sum + (gp.finalRank ?? 0), 0) / totalGames
+          ? allGames.reduce((sum: number, gp: typeof allGames[0]) => sum + (gp.finalRank ?? 0), 0) / totalGames
           : 0;
 
       // 和了/放銃の統計
@@ -261,17 +271,17 @@ export async function statsRoutes(app: FastifyInstance) {
         },
       });
 
-      const wins = roundStats.filter((s) => s.isWinner);
-      const losses = roundStats.filter((s) => s.isLoser);
+      const wins = roundStats.filter((s: typeof roundStats[0]) => s.isWinner);
+      const losses = roundStats.filter((s: typeof roundStats[0]) => s.isLoser);
 
       const averageWinScore =
         wins.length > 0
-          ? Math.round(wins.reduce((sum, stat) => sum + stat.scoreDelta, 0) / wins.length)
+          ? Math.round(wins.reduce((sum: number, stat: typeof wins[0]) => sum + stat.scoreDelta, 0) / wins.length)
           : 0;
 
       const averageWinHan =
         wins.length > 0
-          ? Math.round((wins.reduce((sum, stat) => sum + (stat.han ?? 0), 0) / wins.length) * 100) /
+          ? Math.round((wins.reduce((sum: number, stat: typeof wins[0]) => sum + (stat.han ?? 0), 0) / wins.length) * 100) /
             100
           : 0;
 
@@ -279,7 +289,7 @@ export async function statsRoutes(app: FastifyInstance) {
       const averageLossScore =
         losses.length > 0
           ? Math.round(
-              losses.reduce((sum, stat) => sum + Math.abs(stat.scoreDelta), 0) /
+              losses.reduce((sum: number, stat: typeof losses[0]) => sum + Math.abs(stat.scoreDelta), 0) /
                 losses.length,
             )
           : 0;
@@ -358,7 +368,7 @@ export async function statsRoutes(app: FastifyInstance) {
         averageLossScoreDelta:
           losses.length > 0
             ? Math.round(
-                losses.reduce((s, l) => s + l.scoreDelta, 0) / losses.length,
+                losses.reduce((s: number, l: typeof losses[0]) => s + l.scoreDelta, 0) / losses.length,
               )
             : 0,
       });
@@ -394,13 +404,13 @@ export async function statsRoutes(app: FastifyInstance) {
       });
 
       return reply.send(
-        games.map((gp) => ({
+        games.map((gp: typeof games[0]) => ({
           gameId: gp.gameId,
           gameType: gp.game.gameType,
           finishedAt: gp.game.finishedAt,
           myRank: gp.finalRank,
           myScore: gp.finalScore,
-          players: gp.game.gamePlayers.map((p) => ({
+          players: gp.game.gamePlayers.map((p: typeof gp.game.gamePlayers[0]) => ({
             playerName: p.playerName,
             finalScore: p.finalScore,
             finalRank: p.finalRank,

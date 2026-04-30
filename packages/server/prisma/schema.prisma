@@ -63,8 +63,9 @@ model Round {
   resultType  String   @map("result_type") // "tsumo" | "ron" | "draw" | "abortive_draw"
   createdAt   DateTime @default(now()) @map("created_at")
 
-  game  Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  stats RoundPlayerStat[]
+  game       Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  stats      RoundPlayerStat[]
+  roundEvent RoundEvent?       // 牌譜再生用イベントログ
 
   @@map("rounds")
 }
@@ -86,4 +87,17 @@ model RoundPlayerStat {
 
   @@unique([roundId, gamePlayerId])
   @@map("round_player_stats")
+}
+
+/// 牌譜再生用イベントログ（JSON配列保存）
+model RoundEvent {
+  id        String   @id @default(cuid())
+  roundId   String   @unique @map("round_id")
+  eventData String   @map("event_data") // JSON: { version, roundMeta, initialHands, events: [] }
+  createdAt DateTime @default(now()) @map("created_at")
+
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@index([roundId])
+  @@map("round_events")
 }

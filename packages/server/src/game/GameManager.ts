@@ -367,6 +367,17 @@ export class GameManager {
     });
   }
 
+  /**
+   * 局の牌譜イベントを保存する（Step2で実装）
+   * roundId と eventData JSON を受け取り、RoundEvent テーブルに保存する
+   * @param roundId Round.id
+   * @param eventDataJson RoundEventDataDto の JSON文字列
+   */
+  async persistRoundEvent(roundId: string, eventDataJson: string): Promise<void> {
+    // 実装は Step2 で行う
+    // await this.prisma.roundEvent.create({...});
+  }
+
   private async persistGameFinished(room: ActiveRoom, gameResult: GameResult): Promise<void> {
     if (!room.dbGameId) return;
 

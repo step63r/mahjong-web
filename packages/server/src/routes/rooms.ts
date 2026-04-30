@@ -47,7 +47,7 @@ export async function roomRoutes(app: FastifyInstance) {
         gameType: game.gameType,
         status: game.status,
         hostSeatIndex: 0,
-        players: game.gamePlayers.map((p) => ({
+        players: game.gamePlayers.map((p: typeof game.gamePlayers[0]) => ({
           seatIndex: p.seatIndex,
           playerName: p.playerName,
           isConnected: false,
@@ -110,12 +110,14 @@ export async function roomRoutes(app: FastifyInstance) {
         gameType: updated!.gameType,
         status: updated!.status,
         hostSeatIndex: 0,
-        players: updated!.gamePlayers.map((p) => ({
+        players: updated!.gamePlayers.map(
+          (p: { seatIndex: number; playerName: string; userId: string | null }) => ({
           seatIndex: p.seatIndex,
           playerName: p.playerName,
           isConnected: false,
           userId: p.userId,
-        })),
+          }),
+        ),
       });
     },
   );
@@ -138,7 +140,7 @@ export async function roomRoutes(app: FastifyInstance) {
         gameType: game.gameType,
         status: game.status,
         hostSeatIndex: 0,
-        players: game.gamePlayers.map((p) => ({
+        players: game.gamePlayers.map((p: typeof game.gamePlayers[0]) => ({
           seatIndex: p.seatIndex,
           playerName: p.playerName,
           isConnected: false,
