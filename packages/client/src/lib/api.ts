@@ -1,4 +1,5 @@
 import { getIdToken } from "firebase/auth";
+import type { RoundEventDataDto } from "@mahjong-web/shared";
 import { firebaseAuth } from "@/lib/firebase/config";
 
 export interface AuthUserDto {
@@ -66,12 +67,8 @@ export interface SaveCpuGamePayload {
     finalRank: number;
   }>;
   rounds: CpuRoundPayload[];
+  roundEvents?: RoundEventDataDto[];
 }
-
-// Step2: イベント付きペイロード型（牌譜再生対応）
-// export interface SaveCpuGameWithEventsPayload extends SaveCpuGamePayload {
-//   roundEvents?: Array<RoundEventDataDto>; // from @mahjong-web/shared
-// }
 
 export interface SaveCpuGameResponseDto {
   gameId: string;
@@ -173,14 +170,3 @@ export async function saveCpuGame(
     requireAuth: true,
   });
 }
-
-// Step2: イベント付きゲーム保存（牌譜再生対応）
-// export async function saveCpuGameWithEvents(
-//   payload: SaveCpuGameWithEventsPayload,
-// ): Promise<SaveCpuGameResponseDto> {
-//   return apiRequest<SaveCpuGameResponseDto>("/api/stats/games/cpu", {
-//     method: "POST",
-//     body: payload,
-//     requireAuth: true,
-//   });
-// }

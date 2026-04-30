@@ -230,9 +230,15 @@ export interface JoinRoomRequest {
 export interface ReplayEventDto {
   type: string; // "initial_hand" | "draw" | "discard" | "chi" | "pon" | "ankan" | "minkan" | "kakan" | "riichi" | "win" | "exhaustive_draw" | "kyuushu_kyuuhai" | ...
   playerIndex: number;
+  actionType?: string;
   tile?: TileDto;
+  tileType?: string;
   isTsumogiri?: boolean;
   fromPlayerIndex?: number;
+  roundPhase?: string;
+  reason?: string;
+  scoreChanges?: [number, number, number, number];
+  dealerKeeps?: boolean;
   ownTiles?: TileDto[];
   yakuList?: Array<{ name: string; han: number }>;
   totalHan?: number;

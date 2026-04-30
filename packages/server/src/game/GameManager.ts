@@ -48,6 +48,8 @@ import type {
   RoundResultDto,
   GameResultDto,
   ActionDto,
+  RoundEventDataDto,
+  ReplayEventDto,
 } from "@mahjong-web/shared";
 
 // ===== 型定義 =====
@@ -81,6 +83,8 @@ export interface ActiveRoom {
   dbGameId: string | null;
   /** seatIndex -> game_players.id */
   dbGamePlayerIds: Map<number, string>;
+  /** 現在局の牌譜イベントバッファ */
+  currentRoundEventData: RoundEventDataDto | null;
 }
 
 // ===== GameManager =====
@@ -144,6 +148,7 @@ export class GameManager {
       actionTimeout: 30,
       dbGameId: null,
       dbGamePlayerIds: new Map(),
+      currentRoundEventData: null,
     };
     this.rooms.set(roomId, room);
     this.socketToRoom.set(hostPlayer.socketId, roomId);
@@ -322,8 +327,8 @@ export class GameManager {
     result: import("@mahjong-web/domain").RoundResult,
     roundWind: string,
     roundNumber: number,
-  ): Promise<void> {
-    if (!room.dbGameId) return;
+  ): Promise<string | null> {
+    if (!room.dbGameId) return null;
 
     const roundWindValue = roundWind === "nan" ? 1 : 0;
 
@@ -365,6 +370,8 @@ export class GameManager {
         };
       }),
     });
+
+    return createdRound.id;
   }
 
   /**
@@ -374,8 +381,12 @@ export class GameManager {
    * @param eventDataJson RoundEventDataDto の JSON文字列
    */
   async persistRoundEvent(roundId: string, eventDataJson: string): Promise<void> {
-    // 実装は Step2 で行う
-    // await this.prisma.roundEvent.create({...});
+    await this.prisma.roundEvent.create({
+      data: {
+        roundId,
+        eventData: eventDataJson,
+      },
+    });
   }
 
   private async persistGameFinished(room: ActiveRoom, gameResult: GameResult): Promise<void> {
@@ -421,6 +432,7 @@ export class GameManager {
     });
     startRound(round);
     room.roundState = round;
+    room.currentRoundEventData = this.createRoundEventData(game, round);
     room.pendingPlayerActions.clear();
     this.clearAllTimers(room);
 
@@ -648,6 +660,7 @@ export class GameManager {
       }
 
       this.clearTimer(room, seatIndex);
+      this.appendRoundActionEvent(room, action, round);
       applyAction(round, action);
       this.broadcastGameState(room);
       this.processGameLoop(room);
@@ -661,6 +674,7 @@ export class GameManager {
       }
 
       this.clearTimer(room, seatIndex);
+      this.appendRoundActionEvent(room, action, round);
       room.pendingPlayerActions.set(seatIndex, action);
 
       // 全員揃ったかチェック
@@ -707,17 +721,32 @@ export class GameManager {
     const completedRoundWind = game.currentRound.roundWind;
     const completedRoundNumber = game.currentRound.roundNumber;
 
+    this.appendRoundResultEvent(room, result, round);
+    const roundEventSnapshot = room.currentRoundEventData
+      ? {
+          ...room.currentRoundEventData,
+          events: [...room.currentRoundEventData.events],
+        }
+      : null;
+
     processRoundResult(game, result);
 
-    void this.persistRoundResult(
-      room,
-      round,
-      result,
-      completedRoundWind,
-      completedRoundNumber,
-    ).catch((error) => {
-      console.error("Failed to persist online round result", error);
-    });
+    void (async () => {
+      try {
+        const roundId = await this.persistRoundResult(
+          room,
+          round,
+          result,
+          completedRoundWind,
+          completedRoundNumber,
+        );
+        if (roundId && roundEventSnapshot) {
+          await this.persistRoundEvent(roundId, JSON.stringify(roundEventSnapshot));
+        }
+      } catch (error) {
+        console.error("Failed to persist online round result", error);
+      }
+    })();
 
     // 結果を送信
     const resultDto = this.toRoundResultDto(result);
@@ -787,6 +816,7 @@ export class GameManager {
     const defaultAction = this.chooseDefaultAction(actions, seatIndex);
 
     if (round.phase === RoundPhase.DrawPhase && round.activePlayerIndex === seatIndex) {
+      this.appendRoundActionEvent(room, defaultAction, round);
       applyAction(round, defaultAction);
       this.broadcastGameState(room);
       this.processGameLoop(room);
@@ -795,6 +825,7 @@ export class GameManager {
       round.phase === RoundPhase.AfterKan
     ) {
       if (!room.pendingPlayerActions.has(seatIndex)) {
+        this.appendRoundActionEvent(room, defaultAction, round);
         room.pendingPlayerActions.set(seatIndex, defaultAction);
         if (this.allActionsCollected(room)) {
           if (round.phase === RoundPhase.AfterDiscard) {
@@ -986,6 +1017,112 @@ export class GameManager {
         default:
           return true; // Tsumo, Ron, Pon, Minkan, Skip, KyuushuKyuuhai
       }
+    });
+  }
+
+  private createRoundEventData(game: GameState, round: RoundState): RoundEventDataDto {
+    const initialHands: [TileDto[], TileDto[], TileDto[], TileDto[]] = [0, 1, 2, 3].map(
+      (seatIndex) => round.players[seatIndex].hand.getTiles().map(tileToDto),
+    ) as [TileDto[], TileDto[], TileDto[], TileDto[]];
+
+    return {
+      version: 1,
+      roundWind: game.currentRound.roundWind,
+      roundNumber: game.currentRound.roundNumber,
+      dealerIndex: game.dealerIndex,
+      honba: round.honba,
+      riichiSticks: round.riichiSticks,
+      initialHands,
+      events: [],
+    };
+  }
+
+  private appendRoundActionEvent(room: ActiveRoom, action: PlayerAction, round: RoundState): void {
+    if (!room.currentRoundEventData) return;
+
+    const event: ReplayEventDto = {
+      type: "action",
+      actionType: action.type,
+      playerIndex: action.playerIndex,
+      roundPhase: round.phase,
+    };
+
+    switch (action.type) {
+      case ActionType.Discard:
+        event.type = "discard";
+        event.tile = tileToDto(action.tile);
+        event.isTsumogiri = action.isTsumogiri;
+        break;
+      case ActionType.Riichi:
+        event.type = "riichi";
+        event.tile = tileToDto(action.tile);
+        break;
+      case ActionType.Ankan:
+        event.type = "ankan";
+        event.tileType = action.tileType;
+        break;
+      case ActionType.Kakan:
+        event.type = "kakan";
+        event.tile = tileToDto(action.tile);
+        break;
+      case ActionType.Chi:
+        event.type = "chi";
+        event.tile = tileToDto(action.candidate.calledTile);
+        event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+        break;
+      case ActionType.Pon:
+        event.type = "pon";
+        if (round.lastDiscardTile) {
+          event.tile = tileToDto(round.lastDiscardTile);
+          event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+        }
+        break;
+      case ActionType.Minkan:
+        event.type = "minkan";
+        if (round.lastDiscardTile) {
+          event.tile = tileToDto(round.lastDiscardTile);
+          event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+        }
+        break;
+      case ActionType.Tsumo:
+        event.type = "tsumo";
+        break;
+      case ActionType.Ron:
+        event.type = "ron";
+        if (round.lastDiscardTile) {
+          event.tile = tileToDto(round.lastDiscardTile);
+          event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+        }
+        break;
+      case ActionType.KyuushuKyuuhai:
+        event.type = "kyuushu_kyuuhai";
+        break;
+      case ActionType.Skip:
+        event.type = "skip";
+        break;
+      default:
+        event.type = "action";
+        break;
+    }
+
+    room.currentRoundEventData.events.push(event);
+  }
+
+  private appendRoundResultEvent(
+    room: ActiveRoom,
+    result: import("@mahjong-web/domain").RoundResult,
+    round: RoundState,
+  ): void {
+    if (!room.currentRoundEventData) return;
+
+    room.currentRoundEventData.events.push({
+      type: "round_result",
+      playerIndex: round.activePlayerIndex,
+      reason: result.reason,
+      scoreChanges: [...result.scoreChanges] as [number, number, number, number],
+      tenpaiPlayers: [...result.tenpaiPlayers],
+      dealerKeeps: result.dealerKeeps,
+      roundPhase: round.phase,
     });
   }
 

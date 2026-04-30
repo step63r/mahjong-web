@@ -32,6 +32,53 @@ const cpuGamePlayerSchema = z.object({
   finalRank: z.number().int().min(1).max(4),
 });
 
+const replayTileSchema = z.object({
+  type: z.string().min(1),
+  id: z.number().int().min(0),
+  isRedDora: z.boolean(),
+});
+
+const replayEventSchema = z.object({
+  type: z.string().min(1),
+  playerIndex: z.number().int().min(0).max(3),
+  actionType: z.string().optional(),
+  tile: replayTileSchema.optional(),
+  tileType: z.string().optional(),
+  isTsumogiri: z.boolean().optional(),
+  fromPlayerIndex: z.number().int().min(0).max(3).optional(),
+  roundPhase: z.string().optional(),
+  reason: z.string().optional(),
+  scoreChanges: z.tuple([
+    z.number().int(),
+    z.number().int(),
+    z.number().int(),
+    z.number().int(),
+  ]).optional(),
+  dealerKeeps: z.boolean().optional(),
+  ownTiles: z.array(replayTileSchema).optional(),
+  yakuList: z.array(yakuEntrySchema).optional(),
+  totalHan: z.number().int().optional(),
+  totalFu: z.number().int().optional(),
+  loserIndex: z.number().int().min(0).max(3).optional(),
+  tenpaiPlayers: z.array(z.boolean()).length(4).optional(),
+});
+
+const roundEventDataSchema = z.object({
+  version: z.number().int().min(1),
+  roundWind: z.string().min(1),
+  roundNumber: z.number().int().min(1),
+  dealerIndex: z.number().int().min(0).max(3),
+  honba: z.number().int().min(0),
+  riichiSticks: z.number().int().min(0),
+  initialHands: z.tuple([
+    z.array(replayTileSchema),
+    z.array(replayTileSchema),
+    z.array(replayTileSchema),
+    z.array(replayTileSchema),
+  ]),
+  events: z.array(replayEventSchema),
+});
+
 const saveCpuGameSchema = z
   .object({
     gameType: z.enum(["cpu_tonpu", "cpu_hanchan"]),
@@ -40,6 +87,7 @@ const saveCpuGameSchema = z
     finishedAt: z.string().datetime().optional(),
     players: z.array(cpuGamePlayerSchema).length(4),
     rounds: z.array(cpuRoundSchema).min(1),
+    roundEvents: z.array(roundEventDataSchema).optional(),
   })
   .superRefine((value, ctx) => {
     const seatSet = new Set(value.players.map((p) => p.seatIndex));
@@ -86,6 +134,14 @@ const saveCpuGameSchema = z
         }
       }
     });
+
+    if (value.roundEvents && value.roundEvents.length !== value.rounds.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["roundEvents"],
+        message: "roundEvents length must match rounds length",
+      });
+    }
   });
 
 const statsSummaryQuerySchema = z.object({
@@ -110,7 +166,7 @@ export async function statsRoutes(app: FastifyInstance) {
 
       const finishedAt = body.finishedAt ? new Date(body.finishedAt) : new Date();
 
-      const created = await app.prisma.$transaction(async (tx: Parameters<typeof app.prisma.$transaction>[0]) => {
+      const created = await app.prisma.$transaction(async (tx) => {
         const game = await tx.game.create({
           data: {
             gameType: body.gameType,
@@ -136,7 +192,7 @@ export async function statsRoutes(app: FastifyInstance) {
           game.gamePlayers.map((player: typeof game.gamePlayers[0]) => [player.seatIndex, player.id]),
         );
 
-        for (const round of body.rounds) {
+        for (const [roundIndex, round] of body.rounds.entries()) {
           const createdRound = await tx.round.create({
             data: {
               gameId: game.id,
@@ -167,15 +223,15 @@ export async function statsRoutes(app: FastifyInstance) {
             }),
           });
 
-          // Step2: roundEventsデータがあれば RoundEvent を作成
-          // if (body.roundEvents?.[round.roundNumber - 1]) {
-          //   await tx.roundEvent.create({
-          //     data: {
-          //       roundId: createdRound.id,
-          //       eventData: JSON.stringify(body.roundEvents[round.roundNumber - 1]),
-          //     },
-          //   });
-          // }
+          const roundEvent = body.roundEvents?.[roundIndex];
+          if (roundEvent) {
+            await tx.roundEvent.create({
+              data: {
+                roundId: createdRound.id,
+                eventData: JSON.stringify(roundEvent),
+              },
+            });
+          }
         }
 
         return {

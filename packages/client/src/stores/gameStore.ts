@@ -30,6 +30,7 @@ import {
   BasicAiPlayer,
   GameLength,
 } from "@mahjong-web/domain";
+import type { RoundEventDataDto, ReplayEventDto, TileDto } from "@mahjong-web/shared";
 import { saveCpuGame } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -60,6 +61,8 @@ export interface GameStore {
   debugSelectedHandTileKey: string | undefined;
   debugTargetPlayer: number;
   cpuGameSaved: boolean;
+  replayRoundEvents: RoundEventDataDto[];
+  currentRoundReplay: RoundEventDataDto | null;
 
   // actions
   startCpuGame: (ruleConfig: RuleConfig) => void;
@@ -83,6 +86,7 @@ async function saveCpuGameResult(
   gameState: DomainGameState,
   gameResult: GameResult,
   humanPlayerIndex: number,
+  roundEvents: RoundEventDataDto[],
 ): Promise<void> {
   const auth = useAuthStore.getState();
   if (auth.status !== "authenticated" || !auth.profile) {
@@ -128,6 +132,145 @@ async function saveCpuGameResult(
     finishedAt: new Date().toISOString(),
     players,
     rounds,
+    roundEvents,
+  });
+}
+
+function tileToDto(tile: Tile): TileDto {
+  return { type: tile.type, id: tile.id, isRedDora: tile.isRedDora };
+}
+
+function createRoundReplayData(gameState: DomainGameState, round: RoundState): RoundEventDataDto {
+  const initialHands = [0, 1, 2, 3].map((seatIndex) =>
+    round.players[seatIndex].hand.getTiles().map(tileToDto),
+  ) as [TileDto[], TileDto[], TileDto[], TileDto[]];
+
+  return {
+    version: 1,
+    roundWind: gameState.currentRound.roundWind,
+    roundNumber: gameState.currentRound.roundNumber,
+    dealerIndex: gameState.dealerIndex,
+    honba: round.honba,
+    riichiSticks: round.riichiSticks,
+    initialHands,
+    events: [],
+  };
+}
+
+function toReplayActionEvent(round: RoundState, action: PlayerAction): ReplayEventDto {
+  const event: ReplayEventDto = {
+    type: "action",
+    actionType: action.type,
+    playerIndex: action.playerIndex,
+    roundPhase: round.phase,
+  };
+
+  switch (action.type) {
+    case ActionType.Discard:
+      event.type = "discard";
+      event.tile = tileToDto(action.tile);
+      event.isTsumogiri = action.isTsumogiri;
+      break;
+    case ActionType.Riichi:
+      event.type = "riichi";
+      event.tile = tileToDto(action.tile);
+      break;
+    case ActionType.Ankan:
+      event.type = "ankan";
+      event.tileType = action.tileType;
+      break;
+    case ActionType.Kakan:
+      event.type = "kakan";
+      event.tile = tileToDto(action.tile);
+      break;
+    case ActionType.Chi:
+      event.type = "chi";
+      event.tile = tileToDto(action.candidate.calledTile);
+      event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+      break;
+    case ActionType.Pon:
+      event.type = "pon";
+      if (round.lastDiscardTile) {
+        event.tile = tileToDto(round.lastDiscardTile);
+        event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+      }
+      break;
+    case ActionType.Minkan:
+      event.type = "minkan";
+      if (round.lastDiscardTile) {
+        event.tile = tileToDto(round.lastDiscardTile);
+        event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+      }
+      break;
+    case ActionType.Tsumo:
+      event.type = "tsumo";
+      break;
+    case ActionType.Ron:
+      event.type = "ron";
+      if (round.lastDiscardTile) {
+        event.tile = tileToDto(round.lastDiscardTile);
+        event.fromPlayerIndex = round.lastDiscardPlayerIndex;
+      }
+      break;
+    case ActionType.KyuushuKyuuhai:
+      event.type = "kyuushu_kyuuhai";
+      break;
+    case ActionType.Skip:
+      event.type = "skip";
+      break;
+    default:
+      event.type = "action";
+      break;
+  }
+
+  return event;
+}
+
+function appendReplayAction(
+  get: () => GameStore,
+  set: (partial: Partial<GameStore>) => void,
+  round: RoundState,
+  action: PlayerAction,
+): void {
+  const current = get().currentRoundReplay;
+  if (!current) return;
+  set({
+    currentRoundReplay: {
+      ...current,
+      events: [...current.events, toReplayActionEvent(round, action)],
+    },
+  });
+}
+
+function finalizeCurrentRoundReplay(
+  get: () => GameStore,
+  set: (partial: Partial<GameStore>) => void,
+  round: RoundState,
+): void {
+  const current = get().currentRoundReplay;
+  const result = round.result;
+  if (!current || !result) return;
+
+  const completed: RoundEventDataDto = {
+    ...current,
+    events: [
+      ...current.events,
+      {
+        type: "round_result",
+        playerIndex: round.activePlayerIndex,
+        reason: result.reason,
+        scoreChanges: [...result.scoreChanges] as [number, number, number, number],
+        tenpaiPlayers: [...result.tenpaiPlayers],
+        dealerKeeps: result.dealerKeeps,
+        roundPhase: round.phase,
+      },
+    ],
+  };
+
+  const previous = get().replayRoundEvents;
+  set({
+    replayRoundEvents: [...previous, completed],
+    currentRoundReplay: null,
   });
 }
 
@@ -253,6 +396,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   debugSelectedHandTileKey: undefined,
   debugTargetPlayer: 0,
   cpuGameSaved: false,
+  replayRoundEvents: [],
+  currentRoundReplay: null,
 
   startCpuGame: (ruleConfig) => {
     // Strict Mode の二重実行によるゲームループ重複を防止
@@ -281,6 +426,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       availableActions: [],
       selectedTileIndex: undefined,
       cpuGameSaved: false,
+      replayRoundEvents: [],
+      currentRoundReplay: createRoundReplayData(game, round),
     });
 
     // Kick off the game loop
@@ -302,6 +449,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         roundState.phase === RoundPhase.DrawPhase &&
         roundState.activePlayerIndex === humanPlayerIndex
       ) {
+        appendReplayAction(get, set, roundState, action);
         applyAction(roundState, action);
         set({ availableActions: [], selectedTileIndex: undefined });
       } else if (
@@ -309,7 +457,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         roundState.phase === RoundPhase.AfterKan
       ) {
         // Human responded to discard/kan — collect all responses
-        resolveWithHumanAction(roundState, humanPlayerIndex, action);
+        resolveWithHumanAction(roundState, humanPlayerIndex, action, (resolvedAction) => {
+          appendReplayAction(get, set, roundState, resolvedAction);
+        });
         set({ availableActions: [], selectedTileIndex: undefined });
       }
     }
@@ -319,7 +469,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   nextRound: () => {
-    const { gameState, humanPlayerIndex, cpuGameSaved } = get();
+    const { gameState, humanPlayerIndex, cpuGameSaved, replayRoundEvents } = get();
     if (!gameState) return;
 
     if (gameState.phase === GamePhase.Finished) {
@@ -328,7 +478,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       if (!cpuGameSaved) {
         set({ cpuGameSaved: true });
-        void saveCpuGameResult(gameState, result, humanPlayerIndex).catch((error) => {
+        void saveCpuGameResult(gameState, result, humanPlayerIndex, replayRoundEvents).catch((error) => {
           console.error("Failed to save CPU game result", error);
           set({ cpuGameSaved: false });
         });
@@ -354,6 +504,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       roundState: round,
       availableActions: [],
       selectedTileIndex: undefined,
+      currentRoundReplay: createRoundReplayData(gameState, round),
     });
 
     setTimeout(() => get().performAction(null as unknown as PlayerAction), 0);
@@ -368,6 +519,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       availableActions: [],
       selectedTileIndex: undefined,
       cpuGameSaved: false,
+      replayRoundEvents: [],
+      currentRoundReplay: null,
     });
   },
 
@@ -444,6 +597,7 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
 
   // Round completed
   if (roundState.phase === RoundPhase.Completed) {
+    finalizeCurrentRoundReplay(get, set, roundState);
     const result = roundState.result!;
     processRoundResult(gameState, result);
     set({ uiPhase: "roundResult" });
@@ -497,6 +651,7 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
       });
 
       const chosen = AI.chooseAction(actions, state, pIdx);
+      appendReplayAction(get, set, state, chosen);
       applyAction(state, chosen);
       set({ roundState: state });
 
@@ -525,7 +680,9 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
     }
 
     // All CPUs decide (+ human auto-skips)
-    resolveAllCpu(roundState, humanPlayerIndex);
+    resolveAllCpu(roundState, humanPlayerIndex, (resolvedAction) => {
+      appendReplayAction(get, set, roundState, resolvedAction);
+    });
     set({ roundState });
     runGameLoop(get, set);
     return;
@@ -553,7 +710,9 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
     }
 
     // All CPUs decide
-    resolveKanAllCpu(roundState, humanPlayerIndex);
+    resolveKanAllCpu(roundState, humanPlayerIndex, (resolvedAction) => {
+      appendReplayAction(get, set, roundState, resolvedAction);
+    });
     set({ roundState });
     runGameLoop(get, set);
     return;
@@ -562,7 +721,12 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
 
 // ===== Resolve helpers =====
 
-function resolveWithHumanAction(round: RoundState, humanIndex: number, humanAction: PlayerAction) {
+function resolveWithHumanAction(
+  round: RoundState,
+  humanIndex: number,
+  humanAction: PlayerAction,
+  onActionSelected: (action: PlayerAction) => void,
+) {
   if (round.phase === RoundPhase.AfterDiscard) {
     const discardPlayer = round.lastDiscardPlayerIndex!;
     const discardTile = round.lastDiscardTile!;
@@ -572,6 +736,7 @@ function resolveWithHumanAction(round: RoundState, humanIndex: number, humanActi
       if (i === discardPlayer) continue;
       if (i === humanIndex) {
         playerActions.set(i, humanAction);
+        onActionSelected(humanAction);
         continue;
       }
       const player = round.players[i];
@@ -595,6 +760,7 @@ function resolveWithHumanAction(round: RoundState, humanIndex: number, humanActi
       });
       const chosen = AI.chooseAction(actions, round, i);
       playerActions.set(i, chosen);
+      onActionSelected(chosen);
     }
     resolveAfterDiscard(round, playerActions);
   } else if (round.phase === RoundPhase.AfterKan) {
@@ -605,6 +771,7 @@ function resolveWithHumanAction(round: RoundState, humanIndex: number, humanActi
       if (i === kanPlayer) continue;
       if (i === humanIndex) {
         playerActions.set(i, humanAction);
+        onActionSelected(humanAction);
         continue;
       }
       const actions = getAfterKanActions(round, i);
@@ -613,12 +780,17 @@ function resolveWithHumanAction(round: RoundState, humanIndex: number, humanActi
       );
       const chosen = ronOrSkip.length > 0 ? AI.chooseAction(ronOrSkip, round, i) : skipAction(i);
       playerActions.set(i, chosen);
+      onActionSelected(chosen);
     }
     resolveAfterKan(round, playerActions);
   }
 }
 
-function resolveAllCpu(round: RoundState, humanIndex: number) {
+function resolveAllCpu(
+  round: RoundState,
+  humanIndex: number,
+  onActionSelected: (action: PlayerAction) => void,
+) {
   const discardPlayer = round.lastDiscardPlayerIndex!;
   const discardTile = round.lastDiscardTile!;
   const playerActions = new Map<number, PlayerAction>();
@@ -626,7 +798,9 @@ function resolveAllCpu(round: RoundState, humanIndex: number) {
   for (let i = 0; i < 4; i++) {
     if (i === discardPlayer) continue;
     if (i === humanIndex) {
-      playerActions.set(i, skipAction(i));
+      const autoSkip = skipAction(i);
+      playerActions.set(i, autoSkip);
+      onActionSelected(autoSkip);
       continue;
     }
     const player = round.players[i];
@@ -650,18 +824,25 @@ function resolveAllCpu(round: RoundState, humanIndex: number) {
     });
     const chosen = AI.chooseAction(actions, round, i);
     playerActions.set(i, chosen);
+    onActionSelected(chosen);
   }
   resolveAfterDiscard(round, playerActions);
 }
 
-function resolveKanAllCpu(round: RoundState, humanIndex: number) {
+function resolveKanAllCpu(
+  round: RoundState,
+  humanIndex: number,
+  onActionSelected: (action: PlayerAction) => void,
+) {
   const kanPlayer = round.activePlayerIndex;
   const playerActions = new Map<number, PlayerAction>();
 
   for (let i = 0; i < 4; i++) {
     if (i === kanPlayer) continue;
     if (i === humanIndex) {
-      playerActions.set(i, skipAction(i));
+      const autoSkip = skipAction(i);
+      playerActions.set(i, autoSkip);
+      onActionSelected(autoSkip);
       continue;
     }
     const actions = getAfterKanActions(round, i);
@@ -670,6 +851,7 @@ function resolveKanAllCpu(round: RoundState, humanIndex: number) {
     );
     const chosen = ronOrSkip.length > 0 ? AI.chooseAction(ronOrSkip, round, i) : skipAction(i);
     playerActions.set(i, chosen);
+    onActionSelected(chosen);
   }
   resolveAfterKan(round, playerActions);
 }

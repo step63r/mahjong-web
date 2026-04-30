@@ -19,4 +19,7 @@ export type {
   PlayerGameView,
   GameResultDto,
   ActionDto,
+  ReplayEventDto,
+  RoundEventDataDto,
+  RoundEventDto,
 } from "./types.js";
