@@ -1,5 +1,5 @@
 import { getIdToken } from "firebase/auth";
-import type { RoundEventDataDto } from "@mahjong-web/shared";
+import type { RoundEventDataDto, RoundSummaryDto } from "@mahjong-web/shared";
 import { firebaseAuth } from "@/lib/firebase/config";
 
 export interface AuthUserDto {
@@ -169,4 +169,42 @@ export async function saveCpuGame(
     body: payload,
     requireAuth: true,
   });
+}
+
+export interface GameHistoryDto {
+  gameId: string;
+  gameType: string;
+  finishedAt: string | null;
+  myRank: number | null;
+  myScore: number | null;
+  hasReplay: boolean;
+  players: Array<{
+    playerName: string;
+    finalScore: number | null;
+    finalRank: number | null;
+  }>;
+}
+
+export async function fetchGameHistory(): Promise<GameHistoryDto[]> {
+  return apiRequest<GameHistoryDto[]>("/api/stats/me/games", {
+    method: "GET",
+    requireAuth: true,
+  });
+}
+
+export async function fetchGameRounds(gameId: string): Promise<RoundSummaryDto[]> {
+  return apiRequest<RoundSummaryDto[]>(`/api/stats/games/${encodeURIComponent(gameId)}/rounds`, {
+    method: "GET",
+    requireAuth: true,
+  });
+}
+
+export async function fetchRoundReplay(gameId: string, roundId: string): Promise<RoundEventDataDto> {
+  return apiRequest<RoundEventDataDto>(
+    `/api/stats/games/${encodeURIComponent(gameId)}/rounds/${encodeURIComponent(roundId)}/replay`,
+    {
+      method: "GET",
+      requireAuth: true,
+    },
+  );
 }

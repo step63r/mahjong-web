@@ -454,6 +454,11 @@ export async function statsRoutes(app: FastifyInstance) {
               gamePlayers: {
                 orderBy: { finalRank: "asc" },
               },
+              rounds: {
+                select: {
+                  roundEvent: { select: { id: true } },
+                },
+              },
             },
           },
         },
@@ -466,6 +471,7 @@ export async function statsRoutes(app: FastifyInstance) {
           finishedAt: gp.game.finishedAt,
           myRank: gp.finalRank,
           myScore: gp.finalScore,
+          hasReplay: gp.game.rounds.some((r: typeof gp.game.rounds[0]) => r.roundEvent !== null),
           players: gp.game.gamePlayers.map((p: typeof gp.game.gamePlayers[0]) => ({
             playerName: p.playerName,
             finalScore: p.finalScore,
@@ -473,6 +479,93 @@ export async function statsRoutes(app: FastifyInstance) {
           })),
         })),
       );
+    },
+  );
+
+  // GET /api/stats/games/:gameId/rounds — 局一覧（hasReplay付き）
+  app.get(
+    "/games/:gameId/rounds",
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const { gameId } = request.params as { gameId: string };
+
+      const user = await app.prisma.user.findUnique({
+        where: { firebaseUid: request.uid! },
+      });
+      if (!user) {
+        return reply.code(404).send({ error: "User not found" });
+      }
+
+      // 自分が参加したゲームかチェック
+      const gamePlayer = await app.prisma.gamePlayer.findFirst({
+        where: { gameId, userId: user.id },
+      });
+      if (!gamePlayer) {
+        return reply.code(403).send({ error: "Forbidden" });
+      }
+
+      const rounds = await app.prisma.round.findMany({
+        where: { gameId },
+        orderBy: [{ roundWind: "asc" }, { roundNumber: "asc" }, { honba: "asc" }],
+        include: {
+          roundEvent: { select: { id: true } },
+        },
+      });
+
+      return reply.send(
+        rounds.map((r: typeof rounds[0]) => ({
+          roundId: r.id,
+          roundWind: r.roundWind,
+          roundNumber: r.roundNumber,
+          honba: r.honba,
+          resultType: r.resultType,
+          hasReplay: r.roundEvent !== null,
+        })),
+      );
+    },
+  );
+
+  // GET /api/stats/games/:gameId/rounds/:roundId/replay — 牌譜データ取得
+  app.get(
+    "/games/:gameId/rounds/:roundId/replay",
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const { gameId, roundId } = request.params as { gameId: string; roundId: string };
+
+      const user = await app.prisma.user.findUnique({
+        where: { firebaseUid: request.uid! },
+      });
+      if (!user) {
+        return reply.code(404).send({ error: "User not found" });
+      }
+
+      // 自分が参加したゲームかチェック
+      const gamePlayer = await app.prisma.gamePlayer.findFirst({
+        where: { gameId, userId: user.id },
+      });
+      if (!gamePlayer) {
+        return reply.code(403).send({ error: "Forbidden" });
+      }
+
+      const round = await app.prisma.round.findFirst({
+        where: { id: roundId, gameId },
+        include: { roundEvent: true },
+      });
+      if (!round) {
+        return reply.code(404).send({ error: "Round not found" });
+      }
+      if (!round.roundEvent) {
+        return reply.code(404).send({ error: "Replay not found" });
+      }
+
+      let eventData: unknown;
+      try {
+        eventData = JSON.parse(round.roundEvent.eventData) as unknown;
+      } catch {
+        return reply.code(500).send({ error: "Replay data is corrupted" });
+      }
+
+      return reply.send(eventData);
     },
   );
 }

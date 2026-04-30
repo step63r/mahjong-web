@@ -22,4 +22,5 @@ export type {
   ReplayEventDto,
   RoundEventDataDto,
   RoundEventDto,
+  RoundSummaryDto,
 } from "./types.js";

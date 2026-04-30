@@ -43,11 +43,22 @@ export interface GameHistoryDto {
   finishedAt: string | null;
   myRank: number | null;
   myScore: number | null;
+  hasReplay: boolean;
   players: Array<{
     playerName: string;
     finalScore: number | null;
     finalRank: number | null;
   }>;
+}
+
+/** 局サマリー（牌譜有無を含む） */
+export interface RoundSummaryDto {
+  roundId: string;
+  roundWind: number;
+  roundNumber: number;
+  honba: number;
+  resultType: string;
+  hasReplay: boolean;
 }
 
 // === ゲーム状態同期型 ===
