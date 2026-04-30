@@ -10,10 +10,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Yaku } from "@mahjong-web/domain";
-import { getStatsSummary, type StatsSummaryDto } from "@/lib/api";
+import { getStatsSummary, fetchGameHistory, type StatsSummaryDto } from "@/lib/api";
+import type { GameHistoryDto } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 
-type StatsTab = "cpu" | "online";
+type StatsTab = "cpu" | "online" | "history";
 
 interface ChartPoint {
   x: number;
@@ -100,6 +101,11 @@ export function StatsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 対局履歴タブ用
+  const [history, setHistory] = useState<GameHistoryDto[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
   useEffect(() => {
     if (status !== "authenticated") {
       navigate("/menu", { replace: true });
@@ -108,6 +114,31 @@ export function StatsPage() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
+    if (tab === "history") {
+      let cancelled = false;
+      setHistoryLoading(true);
+      setHistoryError(null);
+      void fetchGameHistory()
+        .then((data) => {
+          if (cancelled) return;
+          setHistory(data);
+        })
+        .catch((e: unknown) => {
+          if (cancelled) return;
+          setHistoryError(e instanceof Error ? e.message : "履歴の取得に失敗しました");
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setHistoryLoading(false);
+        });
+      return () => { cancelled = true; };
+    }
+    return undefined;
+  }, [status, tab]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    if (tab === "history") return;
 
     let cancelled = false;
     setIsLoading(true);
@@ -168,9 +199,68 @@ export function StatsPage() {
           >
             対人戦
           </button>
+          <button
+            onClick={() => setTab("history")}
+            className={`px-4 py-2 text-sm rounded-lg font-semibold transition-colors ${
+              tab === "history"
+                ? "bg-purple-600 text-white"
+                : "text-emerald-200 hover:bg-emerald-800"
+            }`}
+          >
+            対局履歴
+          </button>
         </div>
 
-        {isLoading ? (
+        {tab === "history" ? (
+          historyLoading ? (
+            <div className="bg-emerald-950/50 border border-emerald-700/60 rounded-xl p-6 text-emerald-200">
+              読み込み中...
+            </div>
+          ) : historyError ? (
+            <div className="bg-rose-950/40 border border-rose-700/60 rounded-xl p-6 text-rose-200">
+              {historyError}
+            </div>
+          ) : !history || history.length === 0 ? (
+            <div className="bg-emerald-950/50 border border-emerald-700/60 rounded-xl p-6 text-emerald-200">
+              対局履歴がありません
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {history.map((g) => (
+                <div
+                  key={g.gameId}
+                  className="bg-emerald-950/50 border border-emerald-700/60 rounded-xl p-4 flex items-center justify-between gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-emerald-300">
+                      {g.finishedAt ? new Date(g.finishedAt).toLocaleString("ja-JP") : "進行中"}
+                      <span className="ml-2 text-xs text-emerald-500">
+                        {g.gameType === "tonpu" ? "東風戦" : "半荘戦"}
+                      </span>
+                    </p>
+                    <p className="text-base font-semibold mt-1">
+                      {g.myRank != null ? `${g.myRank}位` : ""}
+                      {g.myScore != null ? (
+                        <span className="ml-2 text-sm text-emerald-200">{g.myScore.toLocaleString()}点</span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-emerald-400 mt-0.5 truncate">
+                      {g.players.map((p) => p.playerName).join(" / ")}
+                    </p>
+                  </div>
+                  {g.hasReplay && (
+                    <button
+                      onClick={() => navigate(`/replay?gameId=${g.gameId}`)}
+                      className="shrink-0 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors font-semibold"
+                    >
+                      牌譜
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        ) : isLoading ? (
           <div className="bg-emerald-950/50 border border-emerald-700/60 rounded-xl p-6 text-emerald-200">
             読み込み中...
           </div>

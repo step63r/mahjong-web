@@ -141,9 +141,13 @@ function tileToDto(tile: Tile): TileDto {
 }
 
 function createRoundReplayData(gameState: DomainGameState, round: RoundState): RoundEventDataDto {
-  const initialHands = [0, 1, 2, 3].map((seatIndex) =>
-    round.players[seatIndex].hand.getTiles().map(tileToDto),
-  ) as [TileDto[], TileDto[], TileDto[], TileDto[]];
+  // 親は startRound 後に 14 枚持っているため、配牌の 13 枚のみを記録する。
+  // ドロー牌は DrawPhase 処理時に draw イベントとして記録する。
+  const initialHands = [0, 1, 2, 3].map((seatIndex) => {
+    const tiles = round.players[seatIndex].hand.getTiles();
+    const dealTiles = tiles.length === 14 ? tiles.slice(0, 13) : tiles;
+    return dealTiles.map(tileToDto);
+  }) as [TileDto[], TileDto[], TileDto[], TileDto[]];
 
   return {
     version: 1,
@@ -204,6 +208,7 @@ function toReplayActionEvent(round: RoundState, action: PlayerAction): ReplayEve
       break;
     case ActionType.Tsumo:
       event.type = "tsumo";
+      event.ownTiles = round.players[action.playerIndex].hand.getTiles().map(tileToDto);
       break;
     case ActionType.Ron:
       event.type = "ron";
@@ -211,6 +216,7 @@ function toReplayActionEvent(round: RoundState, action: PlayerAction): ReplayEve
         event.tile = tileToDto(round.lastDiscardTile);
         event.fromPlayerIndex = round.lastDiscardPlayerIndex;
       }
+      event.ownTiles = round.players[action.playerIndex].hand.getTiles().map(tileToDto);
       break;
     case ActionType.KyuushuKyuuhai:
       event.type = "kyuushu_kyuuhai";
@@ -240,6 +246,33 @@ function appendReplayAction(
       events: [...current.events, toReplayActionEvent(round, action)],
     },
   });
+}
+
+function appendDrawEvent(
+  get: () => GameStore,
+  set: (partial: Partial<GameStore>) => void,
+  playerIndex: number,
+  tile: TileDto,
+): void {
+  const current = get().currentRoundReplay;
+  if (!current) return;
+  set({
+    currentRoundReplay: {
+      ...current,
+      events: [...current.events, { type: "draw", playerIndex, tile }],
+    },
+  });
+}
+
+/** 鳴き後の DrawPhase（実際には牌山からドローしていない）かどうか判定 */
+function isPostMeldDrawPhase(get: () => GameStore, playerIndex: number): boolean {
+  const current = get().currentRoundReplay;
+  if (!current || current.events.length === 0) return false;
+  const lastEvent = current.events[current.events.length - 1];
+  return (
+    lastEvent.playerIndex === playerIndex &&
+    (lastEvent.type === "chi" || lastEvent.type === "pon" || lastEvent.type === "minkan")
+  );
 }
 
 function finalizeCurrentRoundReplay(
@@ -607,6 +640,13 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
   // DrawPhase
   if (roundState.phase === RoundPhase.DrawPhase) {
     if (roundState.activePlayerIndex === humanPlayerIndex) {
+      // ドローイベントを記録（鳴き後の DrawPhase は除く）
+      if (!isPostMeldDrawPhase(get, humanPlayerIndex)) {
+        const htiles = roundState.players[humanPlayerIndex].hand.getTiles();
+        if (htiles.length > 0) {
+          appendDrawEvent(get, set, humanPlayerIndex, tileToDto(htiles[htiles.length - 1]));
+        }
+      }
       // Human's turn
       const actions = getHumanDrawActions(roundState, humanPlayerIndex);
       set({
@@ -629,6 +669,11 @@ function runGameLoop(get: () => GameStore, set: (partial: Partial<GameStore>) =>
       const player = state.players[pIdx];
       const handTiles = player.hand.getTiles();
       const drawnTile = handTiles[handTiles.length - 1];
+
+      // ドローイベントを記録（鳴き後の DrawPhase は除く）
+      if (!isPostMeldDrawPhase(get, pIdx)) {
+        appendDrawEvent(get, set, pIdx, tileToDto(drawnTile));
+      }
 
       const actions = getActionsAfterDraw({
         playerIndex: pIdx,

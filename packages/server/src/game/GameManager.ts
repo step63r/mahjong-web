@@ -455,9 +455,17 @@ export class GameManager {
       return;
     }
 
-    // DrawPhase: アクティブプレイヤーにアクションを送信
+  // DrawPhase: アクティブプレイヤーにアクションを送信
     if (round.phase === RoundPhase.DrawPhase) {
       const activeIdx = round.activePlayerIndex;
+      // 鳴き後の DrawPhase がどうか判定し、実際のドローのみイベントを記録する
+      if (!this.isPostMeldDrawPhase(room, activeIdx)) {
+        const player = round.players[activeIdx];
+        const handTiles = player.hand.getTiles();
+        if (handTiles.length > 0) {
+          this.appendDrawEvent(room, activeIdx, handTiles[handTiles.length - 1]);
+        }
+      }
       this.sendActionsToPlayer(room, activeIdx, this.getDrawActions(round, activeIdx));
       return;
     }
@@ -1021,8 +1029,13 @@ export class GameManager {
   }
 
   private createRoundEventData(game: GameState, round: RoundState): RoundEventDataDto {
+    // 親は startRound 後に 14 枚持っているため、配牌の 13 枚のみを記録する。
     const initialHands: [TileDto[], TileDto[], TileDto[], TileDto[]] = [0, 1, 2, 3].map(
-      (seatIndex) => round.players[seatIndex].hand.getTiles().map(tileToDto),
+      (seatIndex) => {
+        const tiles = round.players[seatIndex].hand.getTiles();
+        const dealTiles = tiles.length === 14 ? tiles.slice(0, 13) : tiles;
+        return dealTiles.map(tileToDto);
+      },
     ) as [TileDto[], TileDto[], TileDto[], TileDto[]];
 
     return {
@@ -1086,6 +1099,7 @@ export class GameManager {
         break;
       case ActionType.Tsumo:
         event.type = "tsumo";
+        event.ownTiles = round.players[action.playerIndex].hand.getTiles().map(tileToDto);
         break;
       case ActionType.Ron:
         event.type = "ron";
@@ -1093,6 +1107,7 @@ export class GameManager {
           event.tile = tileToDto(round.lastDiscardTile);
           event.fromPlayerIndex = round.lastDiscardPlayerIndex;
         }
+        event.ownTiles = round.players[action.playerIndex].hand.getTiles().map(tileToDto);
         break;
       case ActionType.KyuushuKyuuhai:
         event.type = "kyuushu_kyuuhai";
@@ -1124,6 +1139,25 @@ export class GameManager {
       dealerKeeps: result.dealerKeeps,
       roundPhase: round.phase,
     });
+  }
+
+  private appendDrawEvent(room: ActiveRoom, playerIndex: number, tile: import("@mahjong-web/domain").Tile): void {
+    if (!room.currentRoundEventData) return;
+    room.currentRoundEventData.events.push({
+      type: "draw",
+      playerIndex,
+      tile: tileToDto(tile),
+    });
+  }
+
+  private isPostMeldDrawPhase(room: ActiveRoom, playerIndex: number): boolean {
+    const events = room.currentRoundEventData?.events;
+    if (!events || events.length === 0) return false;
+    const lastEvent = events[events.length - 1];
+    return (
+      lastEvent.playerIndex === playerIndex &&
+      (lastEvent.type === "chi" || lastEvent.type === "pon" || lastEvent.type === "minkan")
+    );
   }
 
   // ========== シリアライズ / デシリアライズ ==========

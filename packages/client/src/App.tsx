@@ -9,6 +9,7 @@ import { LobbyPage } from "@/pages/LobbyPage";
 import { RoomPage } from "@/pages/RoomPage";
 import { OnlineGamePage } from "@/pages/OnlineGamePage";
 import { StatsPage } from "@/pages/StatsPage";
+import { ReplayPage } from "@/pages/ReplayPage";
 import { useAuthStore } from "./stores/authStore";
 
 export function App() {
@@ -30,6 +31,7 @@ export function App() {
         <Route path="/room" element={<RoomPage />} />
         <Route path="/online-game" element={<OnlineGamePage />} />
         <Route path="/stats" element={<StatsPage />} />
+        <Route path="/replay" element={<ReplayPage />} />
       </Routes>
     </BrowserRouter>
   );
