@@ -13,11 +13,11 @@ interface ReplayStore {
   /** ゲームの局一覧（局タブ表示用） */
   roundSummaries: RoundSummaryDto[] | null;
   /** 現在選択中の局インデックス（roundSummaries 配列の位置） */
-  currentRoundIndex: number;
+  roundIndex: number;
   /** 現在の局のスナップショット配列 */
   snapshots: ReplaySnapshot[] | null;
   /** 現在表示中のスナップショットインデックス */
-  currentSnapshotIndex: number;
+  eventIndex: number;
   /** 非同期ロード中 */
   isLoading: boolean;
   /** エラーメッセージ */
@@ -56,9 +56,9 @@ interface ReplayStore {
 export const useReplayStore = create<ReplayStore>((set, get) => ({
   gameId: null,
   roundSummaries: null,
-  currentRoundIndex: -1,
+  roundIndex: -1,
   snapshots: null,
-  currentSnapshotIndex: 0,
+  eventIndex: 0,
   isLoading: false,
   error: null,
 
@@ -92,9 +92,9 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
       const eventData: RoundEventDataDto = await fetchRoundReplay(gameId, summary.roundId);
       const snapshots = buildReplaySnapshots(eventData);
       set({
-        currentRoundIndex: roundIndex,
+        roundIndex: roundIndex,
         snapshots,
-        currentSnapshotIndex: 0,
+        eventIndex: 0,
         isLoading: false,
       });
     } catch (e) {
@@ -103,18 +103,18 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
   },
 
   stepForward: () => {
-    const { snapshots, currentSnapshotIndex } = get();
+    const { snapshots, eventIndex: currentSnapshotIndex } = get();
     if (!snapshots) return;
     const next = currentSnapshotIndex + 1;
     if (next < snapshots.length) {
-      set({ currentSnapshotIndex: next });
+      set({ eventIndex: next });
     }
   },
 
   stepBackward: () => {
-    const { currentSnapshotIndex } = get();
+    const { eventIndex: currentSnapshotIndex } = get();
     if (currentSnapshotIndex > 0) {
-      set({ currentSnapshotIndex: currentSnapshotIndex - 1 });
+      set({ eventIndex: currentSnapshotIndex - 1 });
     }
   },
 
@@ -122,11 +122,11 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
     const { snapshots } = get();
     if (!snapshots) return;
     const clamped = Math.max(0, Math.min(index, snapshots.length - 1));
-    set({ currentSnapshotIndex: clamped });
+    set({ eventIndex: clamped });
   },
 
   prevRound: () => {
-    const { currentRoundIndex, roundSummaries } = get();
+    const { roundIndex: currentRoundIndex, roundSummaries } = get();
     if (!roundSummaries) return;
     for (let i = currentRoundIndex - 1; i >= 0; i--) {
       if (roundSummaries[i].hasReplay) {
@@ -137,7 +137,7 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
   },
 
   nextRound: () => {
-    const { currentRoundIndex, roundSummaries } = get();
+    const { roundIndex: currentRoundIndex, roundSummaries } = get();
     if (!roundSummaries) return;
     for (let i = currentRoundIndex + 1; i < roundSummaries.length; i++) {
       if (roundSummaries[i].hasReplay) {
@@ -151,9 +151,9 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
     set({
       gameId: null,
       roundSummaries: null,
-      currentRoundIndex: -1,
+      roundIndex: -1,
       snapshots: null,
-      currentSnapshotIndex: 0,
+      eventIndex: 0,
       isLoading: false,
       error: null,
     });

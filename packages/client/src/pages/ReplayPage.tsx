@@ -28,9 +28,9 @@ export function ReplayPage() {
 
   const {
     roundSummaries,
-    currentRoundIndex,
+    roundIndex: currentRoundIndex,
     snapshots,
-    currentSnapshotIndex,
+    eventIndex: currentSnapshotIndex,
     isLoading,
     error,
     loadGame,
