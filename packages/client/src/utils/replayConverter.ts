@@ -241,6 +241,7 @@ export function buildReplaySnapshots(
           states[pi].discards.push({
             tile: discardedTile,
             isRiichi: event.type === "riichi",
+            isTsumogiri: event.isTsumogiri ?? false,
           });
         }
         if (event.type === "riichi") {

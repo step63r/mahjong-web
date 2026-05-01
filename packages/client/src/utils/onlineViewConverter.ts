@@ -28,6 +28,7 @@ function dtoToDiscardEntry(dto: DiscardEntryDto): DiscardEntryData {
   return {
     tile: dtoToTileData(dto.tile),
     isRiichi: dto.isRiichiDeclare,
+    isTsumogiri: dto.isTsumogiri,
   };
 }
 
@@ -62,6 +63,7 @@ function convertDiscards(dtos: readonly DiscardEntryDto[]): DiscardEntryData[] {
       tile: dtoToTileData(dto.tile),
       isRiichi: dto.isRiichiDeclare,
       isRiichiRotated,
+      isTsumogiri: dto.isTsumogiri,
     };
   });
 }

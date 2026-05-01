@@ -114,6 +114,10 @@ function renderDiscardArea(
       ? sideways(tile.type, tile.isRedDora, tileW)
       : lying(tile.type, tile.isRedDora, tileW);
 
+    if (entry.isTsumogiri) {
+      sprite.alpha = 0.7;
+    }
+
     sprite.x =
       dl.origin.x +
       dl.stride.x * col +

@@ -50,13 +50,18 @@ export function DiscardArea({ discards, tileSize = 22, flow = "right", tileRotat
           {group.map((entry, ti) => {
             const isRiichi = entry.isRiichi || entry.isRiichiRotated;
             return (
-              <TileView
+              <div
                 key={gi * 6 + ti}
-                tile={entry.tile}
-                size={tileSize}
-                rotated={isRiichi}
-                rotation={isRiichi ? riichiRotation : tileRotation}
-              />
+                style={entry.isTsumogiri ? { opacity: 0.7 } : undefined}
+                className="inline-block"
+              >
+                <TileView
+                  tile={entry.tile}
+                  size={tileSize}
+                  rotated={isRiichi}
+                  rotation={isRiichi ? riichiRotation : tileRotation}
+                />
+              </div>
             );
           })}
         </div>

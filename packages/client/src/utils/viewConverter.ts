@@ -141,6 +141,7 @@ export function buildPlayerViews(
         tile: toTileData(entry.tile),
         isRiichi: entry.isRiichiDeclare,
         isRiichiRotated,
+        isTsumogiri: entry.isTsumogiri,
       };
     });
 

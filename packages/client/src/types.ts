@@ -12,6 +12,8 @@ export interface DiscardEntryData {
   readonly isRiichi?: boolean;
   /** リーチ宣言牌が鳴かれた場合、代わりにこの牌を横向きにする */
   readonly isRiichiRotated?: boolean;
+  /** ツモ切り（ツモった牌をそのまま捨てた）かどうか */
+  readonly isTsumogiri?: boolean;
 }
 
 export interface MeldViewData {
