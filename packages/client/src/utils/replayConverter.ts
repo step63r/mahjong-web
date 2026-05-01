@@ -102,14 +102,16 @@ function removeTileByType(hand: TileData[], tileType: string): TileData {
  * 呼び牌型を含む順子を形成できる手牌の組み合わせを返す。
  */
 function findChiOwnTypes(hand: TileData[], calledType: string): [string, string] | undefined {
-  const suit = calledType.slice(-1);
-  const num = parseInt(calledType.slice(0, -1), 10);
-  if (isNaN(num) || suit === "z") return undefined;
+  // 牌タイプ形式: "man1"~"man9", "sou1"~"sou9", "pin1"~"pin9"
+  const match = calledType.match(/^(man|sou|pin)(\d)$/);
+  if (!match) return undefined;
+  const suit = match[1];
+  const num = parseInt(match[2], 10);
 
   const candidates: [string, string][] = [];
-  if (num >= 3) candidates.push([`${num - 2}${suit}`, `${num - 1}${suit}`]);
-  if (num >= 2 && num <= 8) candidates.push([`${num - 1}${suit}`, `${num + 1}${suit}`]);
-  if (num <= 7) candidates.push([`${num + 1}${suit}`, `${num + 2}${suit}`]);
+  if (num >= 3) candidates.push([`${suit}${num - 2}`, `${suit}${num - 1}`]);
+  if (num >= 2 && num <= 8) candidates.push([`${suit}${num - 1}`, `${suit}${num + 1}`]);
+  if (num <= 7) candidates.push([`${suit}${num + 1}`, `${suit}${num + 2}`]);
 
   for (const [t1, t2] of candidates) {
     const idx1 = hand.findIndex((t) => t.type === t1);
@@ -257,6 +259,10 @@ export function buildReplaySnapshots(
       case "chi": {
         const calledTile = event.tile ? dtoToTileData(event.tile) : BACK_TILE;
         const fromIdx = event.fromPlayerIndex ?? ((pi + 3) % 4);
+        // 鳴き元の河から最後の牌を削除
+        if (states[fromIdx].discards.length > 0) {
+          states[fromIdx].discards.splice(states[fromIdx].discards.length - 1, 1);
+        }
 
         // 呼んだ牌の2枚を手牌から除去（推定）
         let own1: TileData = BACK_TILE;
@@ -295,6 +301,10 @@ export function buildReplaySnapshots(
       case "pon": {
         const calledTile = event.tile ? dtoToTileData(event.tile) : BACK_TILE;
         const fromIdx = event.fromPlayerIndex ?? 0;
+        // 鳴き元の河から最後の牌を削除
+        if (states[fromIdx].discards.length > 0) {
+          states[fromIdx].discards.splice(states[fromIdx].discards.length - 1, 1);
+        }
         const own1 = event.tile ? removeTileByType(states[pi].hand, event.tile.type) : BACK_TILE;
         const own2 = event.tile ? removeTileByType(states[pi].hand, event.tile.type) : BACK_TILE;
         states[pi].drawnTile = undefined;
@@ -320,6 +330,10 @@ export function buildReplaySnapshots(
       case "minkan": {
         const calledTile = event.tile ? dtoToTileData(event.tile) : BACK_TILE;
         const fromIdx = event.fromPlayerIndex ?? 0;
+        // 鳴き元の河から最後の牌を削除
+        if (states[fromIdx].discards.length > 0) {
+          states[fromIdx].discards.splice(states[fromIdx].discards.length - 1, 1);
+        }
         const own1 = event.tile ? removeTileByType(states[pi].hand, event.tile.type) : BACK_TILE;
         const own2 = event.tile ? removeTileByType(states[pi].hand, event.tile.type) : BACK_TILE;
         const own3 = event.tile ? removeTileByType(states[pi].hand, event.tile.type) : BACK_TILE;
