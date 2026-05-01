@@ -141,6 +141,10 @@ export interface RoundResultDto {
   scoreChanges: [number, number, number, number];
   tenpaiPlayers: boolean[];
   dealerKeeps: boolean;
+  /** ドラ表示牌 */
+  doraIndicators: TileDto[];
+  /** 裏ドラ表示牌 */
+  uraDoraIndicators: TileDto[];
 }
 
 /** プレイヤー視点のゲーム状態 */

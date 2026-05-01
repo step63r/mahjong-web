@@ -338,6 +338,19 @@ function OnlineRoundResultOverlay({
     return result.scoreChanges[abs];
   });
 
+  const hasRiichiWin = result.wins.some(
+    (w) => w.yakuList.some((y) => y.name === "riichi" || y.name === "double-riichi"),
+  );
+  const extra = result as RoundResultDto & {
+    doraIndicators?: Array<{ type: string; id: number; isRedDora: boolean }>;
+    uraDoraIndicators?: Array<{ type: string; id: number; isRedDora: boolean }>;
+  };
+  const doraIndicators = extra.doraIndicators ?? [];
+  const uraDoraIndicators = extra.uraDoraIndicators ?? [];
+  const mergedIndicators = hasRiichiWin
+    ? [...doraIndicators, ...uraDoraIndicators]
+    : doraIndicators;
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-emerald-800 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
@@ -363,7 +376,7 @@ function OnlineRoundResultOverlay({
               // 副露を盤面と同じ並びに変換（calledTileIndex で横倒し位置を決定）
               const meldViews = win.melds.map((m) => {
                 if (m.type === "ankan" || !m.calledTile || m.fromPlayerIndex === undefined) {
-                  return { tiles: m.tiles, calledTileIndex: undefined };
+                  return { tiles: m.tiles, calledTileIndex: undefined, meldType: m.type };
                 }
                 const relative = (m.fromPlayerIndex - win.winnerIndex + 4) % 4;
                 const calledTile = m.calledTile;
@@ -371,18 +384,23 @@ function OnlineRoundResultOverlay({
                   (t) => !(t.type === calledTile.type && t.id === calledTile.id),
                 );
                 if (relative === 3) {
-                  return { tiles: [calledTile, ...ownTiles], calledTileIndex: 0 };
+                  return { tiles: [calledTile, ...ownTiles], calledTileIndex: 0, meldType: m.type };
                 } else if (relative === 2) {
                   if (m.type === "minkan" || m.type === "kakan") {
                     return {
                       tiles: [ownTiles[0], calledTile, ownTiles[1], ownTiles[2]],
                       calledTileIndex: 1,
+                      meldType: m.type,
                     };
                   }
-                  return { tiles: [ownTiles[0], calledTile, ownTiles[1]], calledTileIndex: 1 };
+                  return {
+                    tiles: [ownTiles[0], calledTile, ownTiles[1]],
+                    calledTileIndex: 1,
+                    meldType: m.type,
+                  };
                 } else {
                   const tiles = [...ownTiles, calledTile];
-                  return { tiles, calledTileIndex: tiles.length - 1 };
+                  return { tiles, calledTileIndex: tiles.length - 1, meldType: m.type };
                 }
               });
 
@@ -400,6 +418,15 @@ function OnlineRoundResultOverlay({
                       : "（ツモ）"}
                   </div>
 
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-emerald-400 whitespace-nowrap text-sm">ドラ</span>
+                    <div className="flex gap-0">
+                      {mergedIndicators.map((tile, di) => (
+                        <RoundResultTile key={`dora-${di}`} tile={tile} size={24} />
+                      ))}
+                    </div>
+                  </div>
+
                   {/* 手牌 */}
                   <div className="flex flex-wrap items-end gap-0 mt-2">
                     {nonWinTiles.map((tile, idx) => (
@@ -414,6 +441,10 @@ function OnlineRoundResultOverlay({
                             key={`meld-${mi}-${ti}`}
                             tile={tile}
                             size={28}
+                            faceDown={
+                              meldView.meldType === "ankan"
+                              && (ti === 0 || ti === meldView.tiles.length - 1)
+                            }
                             rotated={ti === meldView.calledTileIndex}
                           />
                         ))}

@@ -304,7 +304,9 @@ function handleTsumo(state: RoundState, playerIndex: number): RoundState {
     dealerKeeps: playerIndex === state.dealerIndex,
     incrementHonba: playerIndex === state.dealerIndex,
     riichiSticksInRound: state.riichiSticks,
-  };
+    doraIndicators: state.wall.getDoraIndicators(),
+    uraDoraIndicators: state.wall.getUraDoraIndicators(),
+    };
 
   applyScoreChanges(state, changes);
   state.result = result;
@@ -646,7 +648,9 @@ function handleKyuushuKyuuhai(state: RoundState, _playerIndex: number): RoundSta
     dealerKeeps: abortRule === AbortiveDraw.DealerKeep,
     incrementHonba: true,
     riichiSticksInRound: state.riichiSticks,
-  };
+    doraIndicators: state.wall.getDoraIndicators(),
+    uraDoraIndicators: state.wall.getUraDoraIndicators(),
+    };
 
   state.result = result;
   state.phase = RoundPhase.Completed;
@@ -726,7 +730,9 @@ function processRon(
     dealerKeeps: dealerWins,
     incrementHonba: dealerWins,
     riichiSticksInRound: state.riichiSticks,
-  };
+    doraIndicators: state.wall.getDoraIndicators(),
+    uraDoraIndicators: state.wall.getUraDoraIndicators(),
+    };
 
   applyScoreChanges(state, changes);
   state.result = result;
@@ -947,7 +953,9 @@ function handleExhaustiveDraw(state: RoundState): RoundState {
     dealerKeeps,
     incrementHonba: true,
     riichiSticksInRound: state.riichiSticks,
-  };
+    doraIndicators: state.wall.getDoraIndicators(),
+    uraDoraIndicators: state.wall.getUraDoraIndicators(),
+    };
 
   applyScoreChanges(state, changes);
   state.result = result;
@@ -988,7 +996,9 @@ function checkSuufonsuRenda(state: RoundState, playerIndex: number, tile: Tile):
         dealerKeeps: rule === AbortiveDraw.DealerKeep,
         incrementHonba: true,
         riichiSticksInRound: state.riichiSticks,
-      };
+        doraIndicators: state.wall.getDoraIndicators(),
+        uraDoraIndicators: state.wall.getUraDoraIndicators(),
+        };
       state.result = result;
       state.phase = RoundPhase.Completed;
       return true;
@@ -1018,7 +1028,9 @@ function checkSuukaikan(state: RoundState): boolean {
       dealerKeeps: rule === AbortiveDraw.DealerKeep,
       incrementHonba: true,
       riichiSticksInRound: state.riichiSticks,
-    };
+      doraIndicators: state.wall.getDoraIndicators(),
+      uraDoraIndicators: state.wall.getUraDoraIndicators(),
+      };
     state.result = result;
     state.phase = RoundPhase.Completed;
     return true;
@@ -1042,7 +1054,9 @@ function checkSuuchaRiichi(state: RoundState): boolean {
       dealerKeeps: rule === AbortiveDraw.DealerKeep,
       incrementHonba: true,
       riichiSticksInRound: state.riichiSticks,
-    };
+      doraIndicators: state.wall.getDoraIndicators(),
+      uraDoraIndicators: state.wall.getUraDoraIndicators(),
+      };
     state.result = result;
     state.phase = RoundPhase.Completed;
     return true;
@@ -1062,7 +1076,9 @@ function handleTripleRonDraw(state: RoundState): RoundState {
     dealerKeeps: true,
     incrementHonba: true,
     riichiSticksInRound: state.riichiSticks,
-  };
+    doraIndicators: state.wall.getDoraIndicators(),
+    uraDoraIndicators: state.wall.getUraDoraIndicators(),
+    };
   state.result = result;
   state.phase = RoundPhase.Completed;
   return state;
@@ -1136,7 +1152,9 @@ function handleNagashiMangan(state: RoundState, winnerIndices: number[]): RoundS
     dealerKeeps,
     incrementHonba: true,
     riichiSticksInRound: state.riichiSticks,
-  };
+    doraIndicators: state.wall.getDoraIndicators(),
+    uraDoraIndicators: state.wall.getUraDoraIndicators(),
+    };
 
   applyScoreChanges(state, changes);
   state.result = result;

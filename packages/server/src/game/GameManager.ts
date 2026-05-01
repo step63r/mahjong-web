@@ -1319,6 +1319,8 @@ export class GameManager {
       scoreChanges: [...result.scoreChanges] as [number, number, number, number],
       tenpaiPlayers: [...result.tenpaiPlayers],
       dealerKeeps: result.dealerKeeps,
+      doraIndicators: result.doraIndicators.map((t) => ({ type: t.type, id: t.id, isRedDora: t.isRedDora })),
+      uraDoraIndicators: result.uraDoraIndicators.map((t) => ({ type: t.type, id: t.id, isRedDora: t.isRedDora })),
     };
   }
 

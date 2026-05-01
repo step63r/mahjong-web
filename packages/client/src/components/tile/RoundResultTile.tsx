@@ -30,11 +30,13 @@ export function RoundResultTile({
 }: RoundResultTileProps) {
   const width = size;
   const height = Math.round(size * (4 / 3));
+  const isBackFace = faceDown || !tile;
 
   const url =
-    faceDown || !tile
+    isBackFace
       ? getTileBackUrl()
       : getTileFaceUrl(tile.type, tile.isRedDora);
+  const imageTransform = `${rotated ? "rotate(-90deg)" : ""}`.trim();
 
   // 横倒しのとき width/height を交換し rotate(-90deg)
   const displayWidth = rotated ? height : width;
@@ -47,16 +49,16 @@ export function RoundResultTile({
         height: displayHeight,
         borderRadius: Math.round(Math.min(width, height) * 0.06),
       }}
-      className={`inline-flex shrink-0 items-center justify-center bg-white overflow-hidden${highlighted ? " outline outline-2 outline-amber-400" : ""}${className ? ` ${className}` : ""}`}
+      className={`inline-flex shrink-0 items-center justify-center ${isBackFace ? "bg-transparent" : "bg-white"} overflow-hidden${highlighted ? " outline outline-2 outline-amber-400" : ""}${className ? ` ${className}` : ""}`}
     >
       <img
         src={url}
         alt={tile?.type ?? "back"}
         style={{
-          width: width * 0.85,
-          height: height * 0.85,
+          width: isBackFace ? "100%" : width * 0.85,
+          height: isBackFace ? "100%" : height * 0.85,
           objectFit: "contain",
-          transform: rotated ? "rotate(-90deg)" : undefined,
+          transform: imageTransform || undefined,
         }}
         draggable={false}
       />

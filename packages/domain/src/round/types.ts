@@ -116,6 +116,10 @@ export interface RoundResult {
   readonly incrementHonba: boolean;
   /** この局終了時点でのリーチ棒数（前局からの繰り越し＋今局の新規宣言を含む） */
   readonly riichiSticksInRound: number;
+  /** ドラ表示牌（通常ドラ＋槓ドラ、開示済みのもの） */
+  readonly doraIndicators: readonly Tile[];
+  /** 裏ドラ表示牌（リーチ和了時に開示） */
+  readonly uraDoraIndicators: readonly Tile[];
 }
 
 // ===== 局の全体状態 =====

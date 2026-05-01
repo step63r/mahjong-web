@@ -72,6 +72,19 @@ const YAKU_NAMES: Record<string, string> = {
 };
 
 export function RoundResultOverlay({ result, scores, onNext }: RoundResultOverlayProps) {
+  const hasRiichiWin = result.wins.some(
+    (w) => w.winContext.isRiichi || w.winContext.isDoubleRiichi,
+  );
+  const extra = result as RoundResult & {
+    doraIndicators?: Parameters<typeof toTileData>[0][];
+    uraDoraIndicators?: Parameters<typeof toTileData>[0][];
+  };
+  const doraIndicators = (extra.doraIndicators ?? []).map(toTileData);
+  const uraDoraIndicators = (extra.uraDoraIndicators ?? []).map(toTileData);
+  const mergedIndicators = hasRiichiWin
+    ? [...doraIndicators, ...uraDoraIndicators]
+    : doraIndicators;
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-emerald-800 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
@@ -115,6 +128,15 @@ export function RoundResultOverlay({ result, scores, onNext }: RoundResultOverla
                       : "（ツモ）"}
                   </div>
 
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-emerald-400 whitespace-nowrap text-sm">ドラ</span>
+                    <div className="flex gap-0">
+                      {mergedIndicators.map((tile, di) => (
+                        <RoundResultTile key={`dora-${di}`} tile={tile} size={24} />
+                      ))}
+                    </div>
+                  </div>
+
                   {/* 手牌 */}
                   <div className="flex flex-wrap items-end gap-0 mt-2">
                     {nonWinTiles.map((tile, idx) => (
@@ -129,6 +151,10 @@ export function RoundResultOverlay({ result, scores, onNext }: RoundResultOverla
                             key={`meld-${mi}-${ti}`}
                             tile={tile}
                             size={28}
+                            faceDown={
+                              meldView.meldType === "ankan"
+                              && (ti === 0 || ti === meldView.tiles.length - 1)
+                            }
                             rotated={ti === meldView.calledTileIndex}
                           />
                         ))}
