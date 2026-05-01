@@ -6,16 +6,16 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "outDir": "./dist",
+    "rootDir": "./src",
     "composite": false,
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@mahjong-web/domain": ["../domain/src/index.ts"],
-      "@mahjong-web/shared": ["../shared/src/index.ts"]
+      "@mahjong-web/domain": ["../../node_modules/@mahjong-web/domain/dist/index.d.ts"],
+      "@mahjong-web/shared": ["../../node_modules/@mahjong-web/shared/dist/index.d.ts"]
     }
   },
   "include": ["src"]

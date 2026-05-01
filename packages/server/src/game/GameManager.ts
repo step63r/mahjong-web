@@ -5,7 +5,7 @@
  * ドメインエンジンを駆動してゲームを進行させる。
  */
 import type { Server } from "socket.io";
-import type { PrismaClient } from "@prisma/client";
+import type { FastifyInstance } from "fastify";
 import {
   createGame,
   startGame,
@@ -53,6 +53,8 @@ import type {
 } from "@mahjong-web/shared";
 
 // ===== 型定義 =====
+
+type PrismaClient = FastifyInstance["prisma"];
 
 export interface RoomPlayer {
   seatIndex: number;
@@ -318,7 +320,9 @@ export class GameManager {
     });
 
     room.dbGameId = game.id;
-    room.dbGamePlayerIds = new Map(game.gamePlayers.map((p) => [p.seatIndex, p.id]));
+    room.dbGamePlayerIds = new Map(
+      game.gamePlayers.map((p: { seatIndex: number; id: string }) => [p.seatIndex, p.id]),
+    );
   }
 
   private async persistRoundResult(
@@ -392,28 +396,30 @@ export class GameManager {
   private async persistGameFinished(room: ActiveRoom, gameResult: GameResult): Promise<void> {
     if (!room.dbGameId) return;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.game.update({
-        where: { id: room.dbGameId! },
-        data: {
-          status: "finished",
-          finishedAt: new Date(),
-        },
-      });
-
-      for (const player of room.players) {
-        const gamePlayerId = room.dbGamePlayerIds.get(player.seatIndex);
-        if (!gamePlayerId) continue;
-
-        await tx.gamePlayer.update({
-          where: { id: gamePlayerId },
+    await this.prisma.$transaction(
+      async (tx: { game: PrismaClient["game"]; gamePlayer: PrismaClient["gamePlayer"] }) => {
+        await tx.game.update({
+          where: { id: room.dbGameId! },
           data: {
-            finalScore: gameResult.finalScores[player.seatIndex],
-            finalRank: gameResult.rankings[player.seatIndex],
+            status: "finished",
+            finishedAt: new Date(),
           },
         });
+
+        for (const player of room.players) {
+          const gamePlayerId = room.dbGamePlayerIds.get(player.seatIndex);
+          if (!gamePlayerId) continue;
+
+          await tx.gamePlayer.update({
+            where: { id: gamePlayerId },
+            data: {
+              finalScore: gameResult.finalScores[player.seatIndex],
+              finalRank: gameResult.rankings[player.seatIndex],
+            },
+          });
+        }
       }
-    });
+    );
   }
 
   private startNewRound(room: ActiveRoom): void {

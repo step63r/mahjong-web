@@ -166,7 +166,12 @@ export async function statsRoutes(app: FastifyInstance) {
 
       const finishedAt = body.finishedAt ? new Date(body.finishedAt) : new Date();
 
-      const created = await app.prisma.$transaction(async (tx) => {
+      const created = await app.prisma.$transaction(async (tx: {
+        game: typeof app.prisma.game;
+        round: typeof app.prisma.round;
+        roundPlayerStat: typeof app.prisma.roundPlayerStat;
+        roundEvent: typeof app.prisma.roundEvent;
+      }) => {
         const game = await tx.game.create({
           data: {
             gameType: body.gameType,

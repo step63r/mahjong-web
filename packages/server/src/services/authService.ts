@@ -1,4 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
+import type { FastifyInstance } from "fastify";
+
+type PrismaClient = FastifyInstance["prisma"];
 
 export class AuthService {
   constructor(private prisma: PrismaClient) {}

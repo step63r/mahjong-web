@@ -1,4 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
+import type { FastifyInstance } from "fastify";
+
+type PrismaClient = FastifyInstance["prisma"];
 
 export class RoomService {
   constructor(private prisma: PrismaClient) {}
@@ -70,7 +72,10 @@ export class RoomService {
       ratingDelta: number;
     }>,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: {
+      game: PrismaClient["game"];
+      gamePlayer: PrismaClient["gamePlayer"];
+    }) => {
       await tx.game.update({
         where: { id: gameId },
         data: { status: "finished", finishedAt: new Date() },
