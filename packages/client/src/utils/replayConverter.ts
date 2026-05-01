@@ -5,6 +5,7 @@
  * 各スナップショットはイベント適用後の盤面状態を表す。
  */
 import type { RoundEventDataDto, ReplayEventDto, TileDto } from "@mahjong-web/shared";
+import { ALL_TILE_TYPES } from "@mahjong-web/domain";
 import type { TileData, DiscardEntryData, MeldViewData, PlayerViewState } from "@/types";
 
 // ===== 公開型定義 =====
@@ -57,16 +58,23 @@ function dtoToTileData(tile: TileDto): TileData {
 
 const BACK_TILE: TileData = { type: "back", id: -1, isRedDora: false };
 
-/** 牌種の並び順 (m → p → s → z) */
+/** ドメインの ALL_TILE_TYPES 順序に基づくインデックスマップ */
+const TILE_TYPE_ORDER: ReadonlyMap<string, number> = new Map(
+  ALL_TILE_TYPES.map((t, i) => [t, i]),
+);
+
+/** 牌種の並び順（ドメインの sortTiles と同じ順序） */
 function tileOrder(type: string): number {
-  const num = parseInt(type, 10);
-  const suit = type.slice(-1);
-  const suitOrder: Record<string, number> = { m: 0, p: 1, s: 2, z: 3 };
-  return (suitOrder[suit] ?? 9) * 100 + (num || 0);
+  return TILE_TYPE_ORDER.get(type) ?? 999;
 }
 
 function sortTileData(tiles: TileData[]): TileData[] {
-  return [...tiles].sort((a, b) => tileOrder(a.type) - tileOrder(b.type));
+  return [...tiles].sort((a, b) => {
+    const diff = tileOrder(a.type) - tileOrder(b.type);
+    if (diff !== 0) return diff;
+    // 同種内: 赤ドラを先に
+    return (a.isRedDora ? 0 : 1) - (b.isRedDora ? 0 : 1);
+  });
 }
 
 /** 手牌から指定牌を1枚除去（ID一致 → 型一致の順で試みる） */
@@ -124,7 +132,7 @@ function buildMeldView(
 
 function buildPlayerViewStates(states: MutablePlayerState[]): readonly PlayerViewState[] {
   return states.map((s) => ({
-    hand: [...s.hand],
+    hand: sortTileData([...s.hand]),
     drawnTile: s.drawnTile,
     discards: [...s.discards],
     melds: [...s.melds],
