@@ -1,5 +1,7 @@
 import type { RoundResult } from "@mahjong-web/domain";
-import { RoundEndReason, Yaku } from "@mahjong-web/domain";
+import { RoundEndReason, Yaku, sortTiles } from "@mahjong-web/domain";
+import { RoundResultTile } from "@/components/tile/RoundResultTile";
+import { toTileData, toMeldView } from "@/utils/viewConverter";
 
 interface RoundResultOverlayProps {
   result: RoundResult;
@@ -72,7 +74,7 @@ const YAKU_NAMES: Record<string, string> = {
 export function RoundResultOverlay({ result, scores, onNext }: RoundResultOverlayProps) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-emerald-800 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+      <div className="bg-emerald-800 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
         <h2 className="text-2xl font-bold text-white text-center mb-4">
           {REASON_LABELS[result.reason] ?? result.reason}
         </h2>
@@ -80,36 +82,73 @@ export function RoundResultOverlay({ result, scores, onNext }: RoundResultOverla
         {/* 和了情報 */}
         {result.wins.length > 0 && (
           <div className="space-y-3 mb-4">
-            {result.wins.map((win, i) => (
-              <div key={i} className="bg-emerald-700/50 rounded-lg p-3">
-                <div className="text-amber-400 font-bold">
-                  {SEAT_NAMES[win.winnerIndex]}
-                  {win.loserIndex !== undefined
-                    ? ` ← ${SEAT_NAMES[win.loserIndex]}（ロン）`
-                    : "（ツモ）"}
+            {result.wins.map((win, i) => {
+              const winCtx = win.winContext;
+              const winTileData = toTileData(winCtx.winTile);
+
+              // 手牌から和了牌を除いた閉じた手牌をソートして表示
+              const rawHand = winCtx.handTiles;
+              const winTileRawIdx = rawHand.map((t, idx) => ({ t, idx }))
+                .filter(({ t }) => t.id === winCtx.winTile.id)
+                .at(-1)?.idx;
+              const nonWinRaw = winTileRawIdx !== undefined
+                ? rawHand.filter((_, idx) => idx !== winTileRawIdx)
+                : rawHand.slice(0, rawHand.length - 1);
+              const nonWinTiles = sortTiles([...nonWinRaw]).map(toTileData);
+
+              // 副露を盤面と同じ並びに変換（calledTileIndex で横倒し位置を取得）
+              const meldViews = winCtx.melds.map((m) => toMeldView(m, win.winnerIndex));
+
+              const yakuNames = win.scoreResult.judgeResult.yakuList
+                .map((y) => YAKU_NAMES[y.yaku] ?? y.yaku);
+              const yakuHan = win.scoreResult.judgeResult.yakuList
+                .reduce((sum, y) => sum + y.han, 0);
+              const doraHan = win.scoreResult.judgeResult.totalHan - yakuHan;
+              if (doraHan > 0) yakuNames.push(`ドラ${doraHan}`);
+
+              return (
+                <div key={i} className="bg-emerald-700/50 rounded-lg p-3">
+                  <div className="text-amber-400 font-bold">
+                    {SEAT_NAMES[win.winnerIndex]}
+                    {win.loserIndex !== undefined
+                      ? ` ← ${SEAT_NAMES[win.loserIndex]}（ロン）`
+                      : "（ツモ）"}
+                  </div>
+
+                  {/* 手牌 */}
+                  <div className="flex flex-wrap items-end gap-0 mt-2">
+                    {nonWinTiles.map((tile, idx) => (
+                      <RoundResultTile key={`hand-${idx}`} tile={tile} size={28} />
+                    ))}
+                    {/* 和了牌（アンバーでハイライト） */}
+                    <RoundResultTile tile={winTileData} size={28} highlighted className="ml-2" />
+                    {[...meldViews].reverse().map((meldView, mi) => (
+                      <span key={`meld-${mi}`} className="flex items-end gap-0 ml-2">
+                        {meldView.tiles.map((tile, ti) => (
+                          <RoundResultTile
+                            key={`meld-${mi}-${ti}`}
+                            tile={tile}
+                            size={28}
+                            rotated={ti === meldView.calledTileIndex}
+                          />
+                        ))}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="text-white text-sm mt-2">
+                    {yakuNames.join("\u3000")}
+                  </div>
+                  <div className="text-emerald-300 text-sm">
+                    {win.scoreResult.totalHan > 0
+                      ? `${win.scoreResult.totalFu}符${win.scoreResult.totalHan}飜`
+                      : "役満"}
+                    {" — "}
+                    {win.scoreResult.payment.totalWinnerGain.toLocaleString()}点
+                  </div>
                 </div>
-                <div className="text-white text-sm mt-1">
-                  {(() => {
-                    const yakuNames = win.scoreResult.judgeResult.yakuList
-                      .map((y) => YAKU_NAMES[y.yaku] ?? y.yaku);
-                    const yakuHan = win.scoreResult.judgeResult.yakuList
-                      .reduce((sum, y) => sum + y.han, 0);
-                    const doraHan = win.scoreResult.judgeResult.totalHan - yakuHan;
-                    if (doraHan > 0) {
-                      yakuNames.push(`ドラ${doraHan}`);
-                    }
-                    return yakuNames.join("\u3000");
-                  })()}
-                </div>
-                <div className="text-emerald-300 text-sm">
-                  {win.scoreResult.totalHan > 0
-                    ? `${win.scoreResult.totalFu}符${win.scoreResult.totalHan}飜`
-                    : "役満"}
-                  {" — "}
-                  {win.scoreResult.payment.totalWinnerGain.toLocaleString()}点
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

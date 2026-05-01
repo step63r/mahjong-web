@@ -7,6 +7,7 @@ import type { RuleConfig } from "../rule/index.js";
 import type { ScoreResult } from "../score/index.js";
 import type { PlayerAction } from "../action/index.js";
 import type { Yaku } from "../yaku/index.js";
+import type { WinContext } from "../yaku/index.js";
 
 // ===== 責任払い情報 =====
 
@@ -94,6 +95,8 @@ export interface WinEntry {
   readonly loserIndex: number | undefined;
   /** 点数計算結果 */
   readonly scoreResult: ScoreResult;
+  /** 和了時のコンテキスト（手牌・和了牌・副露情報を含む） */
+  readonly winContext: WinContext;
 }
 
 // ===== 局の結果 =====

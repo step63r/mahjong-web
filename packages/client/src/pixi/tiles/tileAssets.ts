@@ -133,6 +133,13 @@ export function getTileFaceUrl(tileType: string, isRedDora: boolean): string {
 }
 
 /**
+ * 牌の裏面 SVG 画像 URL を取得（HTML <img> 用）
+ */
+export function getTileBackUrl(): string {
+  return imgBack;
+}
+
+/**
  * 牌の表面テクスチャを取得（非同期・キャッシュ済み）
  */
 export function getTileFaceTexture(tileType: string, isRedDora: boolean): Promise<Texture> {

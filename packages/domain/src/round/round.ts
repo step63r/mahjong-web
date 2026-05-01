@@ -298,7 +298,7 @@ function handleTsumo(state: RoundState, playerIndex: number): RoundState {
 
   const result: RoundResult = {
     reason: RoundEndReason.Win,
-    wins: [{ winnerIndex: playerIndex, loserIndex: undefined, scoreResult }],
+    wins: [{ winnerIndex: playerIndex, loserIndex: undefined, scoreResult, winContext: winCtx }],
     scoreChanges: changes,
     tenpaiPlayers: [false, false, false, false],
     dealerKeeps: playerIndex === state.dealerIndex,
@@ -689,7 +689,7 @@ function processRon(
     };
     const scoreResult = calculateScore(scoreCtx);
 
-    wins.push({ winnerIndex, loserIndex: discardPlayerIndex, scoreResult });
+    wins.push({ winnerIndex, loserIndex: discardPlayerIndex, scoreResult, winContext: winCtx });
 
     // 責任払い判定
     const pao = state.paoInfos[winnerIndex];

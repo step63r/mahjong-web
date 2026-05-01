@@ -126,6 +126,12 @@ export interface WinEntryDto {
     tsumoPaymentDealer: number;
     tsumoPaymentChild: number;
   };
+  /** 和了時の手牌（和了牌を含む14枚） */
+  handTiles: TileDto[];
+  /** 和了牌 */
+  winTile: TileDto;
+  /** 副露情報 */
+  melds: MeldDto[];
 }
 
 /** 局結果DTO */

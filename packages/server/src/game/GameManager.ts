@@ -1297,6 +1297,24 @@ export class GameManager {
           tsumoPaymentDealer: w.scoreResult.payment.tsumoPaymentDealer,
           tsumoPaymentChild: w.scoreResult.payment.tsumoPaymentChild,
         },
+        handTiles: w.winContext.handTiles.map((t) => ({
+          type: t.type,
+          id: t.id,
+          isRedDora: t.isRedDora,
+        })),
+        winTile: {
+          type: w.winContext.winTile.type,
+          id: w.winContext.winTile.id,
+          isRedDora: w.winContext.winTile.isRedDora,
+        },
+        melds: w.winContext.melds.map((m) => ({
+          type: m.type,
+          tiles: m.tiles.map((t) => ({ type: t.type, id: t.id, isRedDora: t.isRedDora })),
+          calledTile: m.calledTile
+            ? { type: m.calledTile.type, id: m.calledTile.id, isRedDora: m.calledTile.isRedDora }
+            : undefined,
+          fromPlayerIndex: m.fromPlayerIndex,
+        })),
       })),
       scoreChanges: [...result.scoreChanges] as [number, number, number, number],
       tenpaiPlayers: [...result.tenpaiPlayers],

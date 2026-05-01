@@ -7,7 +7,7 @@ import type { TileData, DiscardEntryData, MeldViewData, PlayerViewState } from "
 
 // ===== Tile conversion =====
 
-function toTileData(tile: Tile): TileData {
+export function toTileData(tile: Tile): TileData {
   return { type: tile.type, id: tile.id, isRedDora: tile.isRedDora };
 }
 
@@ -19,7 +19,7 @@ function toTileData(tile: Tile): TileData {
  * - 対面(toimen):  中 → calledTileIndex = 1（明槓は1）
  * - 下家(shimocha): 右 → calledTileIndex = 末尾
  */
-function toMeldView(meld: Meld, playerIndex: number): MeldViewData {
+export function toMeldView(meld: Meld, playerIndex: number): MeldViewData {
   const meldType = meld.type;
 
   // 暗槓: 横倒し牌なし

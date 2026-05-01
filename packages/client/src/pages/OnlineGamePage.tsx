@@ -10,6 +10,8 @@ import {
 } from "@/utils/onlineViewConverter";
 import type { OnlineWaitingTileInfo } from "@/utils/onlineViewConverter";
 import type { RoundResultDto, GameResultDto } from "@mahjong-web/shared";
+import { RoundResultTile } from "@/components/tile/RoundResultTile";
+import { sortTiles } from "@mahjong-web/domain";
 
 const SEAT_NAMES = ["自家", "下家", "対面", "上家"] as const;
 
@@ -22,6 +24,55 @@ const REASON_LABELS: Record<string, string> = {
   suucha_riichi: "四家リーチ",
   triple_ron_draw: "トリプルロン流局",
   nagashi_mangan: "流し満貫",
+};
+
+const YAKU_NAMES: Record<string, string> = {
+  "riichi": "リーチ",
+  "ippatsu": "一発",
+  "menzen-tsumo": "門前清自摸和",
+  "tanyao": "断么九",
+  "pinfu": "平和",
+  "iipeiko": "一盃口",
+  "yakuhai-round-wind": "場風",
+  "yakuhai-seat-wind": "自風",
+  "yakuhai-haku": "白",
+  "yakuhai-hatsu": "發",
+  "yakuhai-chun": "中",
+  "haitei": "海底摸月",
+  "houtei": "河底撈魚",
+  "rinshan": "嶺上開花",
+  "chankan": "搶槓",
+  "double-riichi": "ダブルリーチ",
+  "chiitoitsu": "七対子",
+  "toitoi": "対々和",
+  "sanankou": "三暗刻",
+  "sanshoku-doukou": "三色同刻",
+  "sanshoku-doujun": "三色同順",
+  "ikkitsuukan": "一気通貫",
+  "chanta": "混全帯么九",
+  "sankantsu": "三槓子",
+  "shousangen": "小三元",
+  "honroutou": "混老頭",
+  "ryanpeiko": "二盃口",
+  "junchan": "純全帯么九",
+  "honitsu": "混一色",
+  "chinitsu": "清一色",
+  "tenhou": "天和",
+  "chiihou": "地和",
+  "kokushi": "国士無双",
+  "kokushi-juusanmen": "国士無双十三面待ち",
+  "suuankou": "四暗刻",
+  "suuankou-tanki": "四暗刻単騎待ち",
+  "daisangen": "大三元",
+  "tsuuiisou": "字一色",
+  "ryuuiisou": "緑一色",
+  "shousuushii": "小四喜",
+  "daisuushii": "大四喜",
+  "chinroutou": "清老頭",
+  "chuuren-poutou": "九蓮宝燈",
+  "junsei-chuuren": "純正九蓮宝燈",
+  "suukantsu": "四槓子",
+  "renhou": "人和",
 };
 
 export function OnlineGamePage() {
@@ -289,7 +340,7 @@ function OnlineRoundResultOverlay({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-emerald-800 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+      <div className="bg-emerald-800 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
         <h2 className="text-2xl font-bold text-white text-center mb-4">
           {REASON_LABELS[result.reason] ?? result.reason}
         </h2>
@@ -297,24 +348,90 @@ function OnlineRoundResultOverlay({
         {/* 和了情報 */}
         {result.wins.length > 0 && (
           <div className="space-y-3 mb-4">
-            {result.wins.map((win, i) => (
-              <div key={i} className="bg-emerald-700/50 rounded-lg p-3">
-                <div className="text-amber-400 font-bold">
-                  {SEAT_NAMES[toRelative(win.winnerIndex)]}
-                  {win.loserIndex !== undefined
-                    ? ` ← ${SEAT_NAMES[toRelative(win.loserIndex)]}（ロン）`
-                    : "（ツモ）"}
+            {result.wins.map((win, i) => {
+              // 手牌の表示（handTiles は和了牌を含む14枚）
+              const winTile = win.winTile;
+              const winTileIdx = win.handTiles.map((t, idx) => ({ t, idx }))
+                .filter(({ t }) => t.id === winTile.id)
+                .at(-1)?.idx;
+              const nonWinRaw = winTileIdx !== undefined
+                ? win.handTiles.filter((_, idx) => idx !== winTileIdx)
+                : win.handTiles.slice(0, win.handTiles.length - 1);
+              // TileDto を Tile として扱ってソート（構造互換）
+              const nonWinTiles = sortTiles(nonWinRaw as Parameters<typeof sortTiles>[0]);
+
+              // 副露を盤面と同じ並びに変換（calledTileIndex で横倒し位置を決定）
+              const meldViews = win.melds.map((m) => {
+                if (m.type === "ankan" || !m.calledTile || m.fromPlayerIndex === undefined) {
+                  return { tiles: m.tiles, calledTileIndex: undefined };
+                }
+                const relative = (m.fromPlayerIndex - win.winnerIndex + 4) % 4;
+                const calledTile = m.calledTile;
+                const ownTiles = m.tiles.filter(
+                  (t) => !(t.type === calledTile.type && t.id === calledTile.id),
+                );
+                if (relative === 3) {
+                  return { tiles: [calledTile, ...ownTiles], calledTileIndex: 0 };
+                } else if (relative === 2) {
+                  if (m.type === "minkan" || m.type === "kakan") {
+                    return {
+                      tiles: [ownTiles[0], calledTile, ownTiles[1], ownTiles[2]],
+                      calledTileIndex: 1,
+                    };
+                  }
+                  return { tiles: [ownTiles[0], calledTile, ownTiles[1]], calledTileIndex: 1 };
+                } else {
+                  const tiles = [...ownTiles, calledTile];
+                  return { tiles, calledTileIndex: tiles.length - 1 };
+                }
+              });
+
+              const yakuNames = win.yakuList.map((y) => YAKU_NAMES[y.name] ?? y.name);
+              const yakuHan = win.yakuList.reduce((sum, y) => sum + y.han, 0);
+              const doraHan = win.totalHan - yakuHan;
+              if (doraHan > 0) yakuNames.push(`ドラ${doraHan}`);
+
+              return (
+                <div key={i} className="bg-emerald-700/50 rounded-lg p-3">
+                  <div className="text-amber-400 font-bold">
+                    {SEAT_NAMES[toRelative(win.winnerIndex)]}
+                    {win.loserIndex !== undefined
+                      ? ` ← ${SEAT_NAMES[toRelative(win.loserIndex)]}（ロン）`
+                      : "（ツモ）"}
+                  </div>
+
+                  {/* 手牌 */}
+                  <div className="flex flex-wrap items-end gap-0 mt-2">
+                    {nonWinTiles.map((tile, idx) => (
+                      <RoundResultTile key={`hand-${idx}`} tile={tile} size={28} />
+                    ))}
+                    {/* 和了牌（アンバーでハイライト） */}
+                    <RoundResultTile tile={winTile} size={28} highlighted className="ml-2" />
+                    {[...meldViews].reverse().map((meldView, mi) => (
+                      <span key={`meld-${mi}`} className="flex items-end gap-0 ml-2">
+                        {meldView.tiles.map((tile, ti) => (
+                          <RoundResultTile
+                            key={`meld-${mi}-${ti}`}
+                            tile={tile}
+                            size={28}
+                            rotated={ti === meldView.calledTileIndex}
+                          />
+                        ))}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="text-white text-sm mt-2">
+                    {yakuNames.join("\u3000")}
+                  </div>
+                  <div className="text-emerald-300 text-sm">
+                    {win.totalHan > 0 ? `${win.totalFu}符${win.totalHan}飜` : "役満"}
+                    {" — "}
+                    {win.payment.totalWinnerGain.toLocaleString()}点
+                  </div>
                 </div>
-                <div className="text-white text-sm mt-1">
-                  {win.yakuList.map((y) => y.name).join("\u3000")}
-                </div>
-                <div className="text-emerald-300 text-sm">
-                  {win.totalHan > 0 ? `${win.totalFu}符${win.totalHan}飜` : "役満"}
-                  {" — "}
-                  {win.payment.totalWinnerGain.toLocaleString()}点
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
