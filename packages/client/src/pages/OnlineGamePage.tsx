@@ -189,7 +189,13 @@ export function OnlineGamePage() {
           const match = discardActions.find((a) => a.tile?.type === tile.type);
           if (match) {
             const isDrawnTile = index === selfView.hand.length;
-            const action = isDrawnTile ? { ...match, isTsumogiri: true } : match;
+            // tile の type + id で正確な牌を特定（赤ドラと通常牌を区別）
+            // ※id は種類ごとに 0-3 なのでグローバル一意でない
+            const action = {
+              ...match,
+              tile: { type: tile.type, id: tile.id, isRedDora: tile.isRedDora },
+              isTsumogiri: isDrawnTile ? true : match.isTsumogiri,
+            };
             sendAction(action);
             return;
           }

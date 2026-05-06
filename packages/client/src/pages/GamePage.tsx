@@ -137,7 +137,15 @@ export function GamePage() {
           );
           if (match) {
             const isDrawnTile = index === selfView.hand.length;
-            const action = isDrawnTile ? { ...match, isTsumogiri: true } : match;
+            // sortedTile の type + id で正確な牌を特定（赤ドラと通常牌を区別）
+            // ※id は種類ごとに 0-3 なのでグローバル一意でない。type と id 両方で照合する
+            const handTiles = roundState!.players[0].hand.getTiles();
+            const exactTile = handTiles.find((t) => t.type === sortedTile.type && t.id === sortedTile.id) ?? match.tile;
+            const action = {
+              ...match,
+              tile: exactTile,
+              isTsumogiri: isDrawnTile ? true : match.isTsumogiri,
+            };
             performAction(action);
             return;
           }
