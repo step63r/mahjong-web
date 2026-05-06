@@ -134,16 +134,17 @@ export function OnlineGamePage() {
     return indices;
   }, [riichiMode, latestView, availableActions, playerViews]);
 
-  // リーチモードで選択中の牌の待ち牌情報
+  // 選択中の牌の待ち牌情報（リーチモード・通常打牌どちらでも計算）
+  const activeWaitingIndex = riichiMode ? riichiSelectedIndex : selectedTileIndex;
   const riichiWaitingTiles: OnlineWaitingTileInfo[] | undefined = useMemo(() => {
-    if (!riichiMode || riichiSelectedIndex === undefined || !latestView) return undefined;
+    if (activeWaitingIndex === undefined || !latestView) return undefined;
     const selfView = playerViews[0];
     if (!selfView) return undefined;
     const tile =
-      riichiSelectedIndex === selfView.hand.length ? selfView.drawnTile : selfView.hand[riichiSelectedIndex];
+      activeWaitingIndex === selfView.hand.length ? selfView.drawnTile : selfView.hand[activeWaitingIndex];
     if (!tile) return undefined;
     return computeOnlineWaitingTiles(latestView, tile.type);
-  }, [riichiMode, riichiSelectedIndex, latestView, playerViews]);
+  }, [activeWaitingIndex, latestView, playerViews]);
 
   // フェーズが変わったらリーチモードを解除
   useEffect(() => {
@@ -279,7 +280,7 @@ export function OnlineGamePage() {
         initialDealerIndex={relativeInitialDealer}
         selectedTileIndex={isMyTurn && !riichiMode ? selectedTileIndex : undefined}
         riichiSelectedIndex={isMyTurn && riichiMode ? riichiSelectedIndex : undefined}
-        riichiWaitingTiles={isMyTurn && riichiMode ? riichiWaitingTiles : undefined}
+        riichiWaitingTiles={isMyTurn ? riichiWaitingTiles : undefined}
         onTileClick={isMyTurn ? handleTileClick : undefined}
         riichiCandidateIndices={isMyTurn ? riichiCandidateIndices : undefined}
         actionButtons={

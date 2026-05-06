@@ -216,8 +216,8 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
 
   // --- リーチツールチップの位置計算 ---
   const tooltipPosition = useMemo(() => {
-    if (props.riichiSelectedIndex === undefined || !props.riichiWaitingTiles?.length) return null;
-    const idx = props.riichiSelectedIndex;
+    const idx = props.riichiSelectedIndex ?? props.selectedTileIndex;
+    if (idx === undefined || !props.riichiWaitingTiles?.length) return null;
     const hand = layout.self.hand;
     const handLen = props.players[0]?.hand.length ?? 0;
     const isTsumo = idx === handLen;
@@ -225,7 +225,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     const tileX = hand.origin.x + hand.stride.x * idx + (isTsumo ? hand.tsumoGap.x : 0);
     const tileY = hand.origin.y;
     return { centerX: tileX + layout.tileW / 2, bottomY: tileY - 4 };
-  }, [props.riichiSelectedIndex, props.riichiWaitingTiles, layout, props.players]);
+  }, [props.riichiSelectedIndex, props.selectedTileIndex, props.riichiWaitingTiles, layout, props.players]);
 
   return (
     <div className="flex flex-col h-screen bg-[#1a1a2e] select-none overflow-hidden">
