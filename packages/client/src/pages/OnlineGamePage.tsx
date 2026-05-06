@@ -188,7 +188,9 @@ export function OnlineGamePage() {
         if (tile) {
           const match = discardActions.find((a) => a.tile?.type === tile.type);
           if (match) {
-            sendAction(match);
+            const isDrawnTile = index === selfView.hand.length;
+            const action = isDrawnTile ? { ...match, isTsumogiri: true } : match;
+            sendAction(action);
             return;
           }
         }

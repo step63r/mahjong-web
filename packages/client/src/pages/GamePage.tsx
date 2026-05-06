@@ -136,7 +136,9 @@ export function GamePage() {
             (a) => a.type === ActionType.Discard && a.tile.type === sortedTile.type,
           );
           if (match) {
-            performAction(match);
+            const isDrawnTile = index === selfView.hand.length;
+            const action = isDrawnTile ? { ...match, isTsumogiri: true } : match;
+            performAction(action);
             return;
           }
         }
