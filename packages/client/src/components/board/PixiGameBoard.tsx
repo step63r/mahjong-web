@@ -214,7 +214,10 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     app.stage.addChild(g);
     highlightGraphicsRef.current = g;
     return () => {
-      app.stage.removeChild(g);
+      // app.destroy() 後は stage が破棄済みのため removeChild をスキップ
+      if (app.stage) {
+        app.stage.removeChild(g);
+      }
       highlightGraphicsRef.current = null;
     };
   }, [app, ready]);

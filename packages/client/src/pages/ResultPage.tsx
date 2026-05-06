@@ -21,7 +21,12 @@ export function ResultPage() {
   };
 
   if (!gameResult) {
-    return null;
+    // useEffect によるリダイレクト待ち（直接URL入力・リロード対策）
+    return (
+      <div className="min-h-screen bg-emerald-900 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-emerald-400 border-t-transparent animate-spin" />
+      </div>
+    );
   }
 
   // 順位順にソート
