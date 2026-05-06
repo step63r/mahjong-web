@@ -810,6 +810,9 @@ export class GameManager {
     const view = this.buildPlayerView(room, seatIndex);
     view.availableActions = actionDtos;
     view.isPostMeld = this.isPostMeldDrawPhase(room, seatIndex);
+    if (room.roundState?.lastDiscardPlayerIndex !== undefined) {
+      view.lastDiscardPlayerIndex = room.roundState.lastDiscardPlayerIndex;
+    }
 
     if (player.socketId && player.isConnected) {
       this.io.to(player.socketId).emit("game:stateUpdate", view);

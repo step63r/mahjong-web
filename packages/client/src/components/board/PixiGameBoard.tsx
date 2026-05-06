@@ -5,12 +5,13 @@
  * コンテナ階層の構築を行う。各領域の実際の描画は Step 5〜8 で実装する。
  */
 import { useRef, useEffect, useState, useMemo, type RefObject } from "react";
-import { Application, Container, Graphics } from "pixi.js";
+import { Application, Container, Graphics, Ticker } from "pixi.js";
 import { TABLE_COLOR } from "../../pixi/tiles/constants";
 import { calculateBoardLayout, type BoardLayout } from "../../pixi/layout";
 import { preloadAllTileAssets } from "../../pixi/tiles/tileAssets";
 import { updateHands } from "../../pixi/renderers/handRenderer";
 import { updateDiscards } from "../../pixi/renderers/discardRenderer";
+import type { LastDiscardPosition } from "../../pixi/renderers/discardRenderer";
 import { updateMelds } from "../../pixi/renderers/meldRenderer";
 import { PixiInfoPanel } from "./PixiInfoPanel";
 import type { PlayerViewState, TileData, DiscardEntryData, MeldViewData } from "../../types";
@@ -42,6 +43,8 @@ export interface PixiGameBoardProps {
   /** リーチモード中の候補牌インデックス集合 */
   riichiCandidateIndices?: ReadonlySet<number>;
   actionButtons?: React.ReactNode;
+  /** 最後の捨て牌をハイライトする（副露アクション選択中）プレイヤー相対インデックス */
+  highlightLastDiscardPlayerIndex?: number;
 }
 
 // ===== コンテナ階層の参照 =====
@@ -197,7 +200,49 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
   const layout = useMemo(() => calculateBoardLayout(boardSize), [boardSize]);
   const containers = useBoardContainers(app, ready, layout, boardSize);
 
-  // --- リサイズ時にキャンバスサイズ追従 ---
+  // --- ハイライト用 Graphics ---
+  const highlightGraphicsRef = useRef<Graphics | null>(null);
+  const highlightPosRef = useRef<LastDiscardPosition | null>(null);
+  const tickerRef = useRef<Ticker | null>(null);
+  const timeRef = useRef<number>(0);
+
+  // ハイライト Graphics を stage に登録（ready になったら）
+  useEffect(() => {
+    if (!app || !ready) return;
+    const g = new Graphics();
+    g.zIndex = 100;
+    app.stage.addChild(g);
+    highlightGraphicsRef.current = g;
+    return () => {
+      app.stage.removeChild(g);
+      highlightGraphicsRef.current = null;
+    };
+  }, [app, ready]);
+
+  // Ticker で明滅
+  useEffect(() => {
+    if (!app || !ready) return;
+    const ticker = new Ticker();
+    tickerRef.current = ticker;
+    ticker.add((t) => {
+      const g = highlightGraphicsRef.current;
+      const pos = highlightPosRef.current;
+      if (!g) return;
+      g.clear();
+      if (!pos) return;
+      timeRef.current += t.deltaMS;
+      // 1000ms で 1 周期（sin で滑らかに明滅）
+      const alpha = 0.25 + 0.25 * Math.sin((timeRef.current / 1000) * Math.PI * 2);
+      g.fill({ color: 0xffdd00, alpha });
+      g.rect(pos.x - 2, pos.y - 2, pos.w + 4, pos.h + 4);
+      g.fill();
+    });
+    ticker.start();
+    return () => {
+      ticker.destroy();
+      tickerRef.current = null;
+    };
+  }, [app, ready]);
   useEffect(() => {
     if (!app || !ready) return;
     app.renderer.resize(boardSize, boardSize);
@@ -210,7 +255,13 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     // リーチモード中は riichiSelectedIndex を選択表示として使用
     const activeSelectedIndex = props.riichiSelectedIndex ?? props.selectedTileIndex;
     updateHands(containers.hands, layout, props.players, activeSelectedIndex, props.onTileClick, props.riichiCandidateIndices);
-    updateDiscards(containers.discards, layout, props.players);
+    const lastPos = updateDiscards(containers.discards, layout, props.players, props.highlightLastDiscardPlayerIndex);
+    highlightPosRef.current = lastPos;
+    // ハイライトがなくなった場合は即座に消す
+    if (!lastPos && highlightGraphicsRef.current) {
+      highlightGraphicsRef.current.clear();
+      timeRef.current = 0;
+    }
     updateMelds(containers.melds, layout, props.players, props.initialDealerIndex, props.roundWind);
   }, [containers, layout, props]);
 

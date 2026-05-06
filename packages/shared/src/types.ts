@@ -177,6 +177,8 @@ export interface PlayerGameView {
   availableActions: ActionDto[];
   /** 副露直後の打牌フェーズか（ツモ切り不可の判定用） */
   isPostMeld?: boolean;
+  /** 最後に捨て牌をしたプレイヤーの絶対インデックス（AfterDiscardフェーズ用） */
+  lastDiscardPlayerIndex?: number;
   /** 局結果（completed時のみ） */
   roundResult?: RoundResultDto;
   /** 最終結果（finished時のみ） */

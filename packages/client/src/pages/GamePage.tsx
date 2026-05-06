@@ -255,6 +255,11 @@ export function GamePage() {
         riichiWaitingTiles={isWaiting ? riichiWaitingTiles : undefined}
         onTileClick={isWaiting ? handleTileClick : undefined}
         riichiCandidateIndices={isWaiting ? riichiCandidateIndices : undefined}
+        highlightLastDiscardPlayerIndex={
+          !debugMode && uiPhase === "waitingHumanAfterDiscard"
+            ? roundState.lastDiscardPlayerIndex
+            : undefined
+        }
         actionButtons={
           isWaiting ? (
             <ActionButtons

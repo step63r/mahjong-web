@@ -284,6 +284,13 @@ export function OnlineGamePage() {
         riichiWaitingTiles={isMyTurn ? riichiWaitingTiles : undefined}
         onTileClick={isMyTurn ? handleTileClick : undefined}
         riichiCandidateIndices={isMyTurn ? riichiCandidateIndices : undefined}
+        highlightLastDiscardPlayerIndex={(() => {
+          if (!isMyTurn || latestView.lastDiscardPlayerIndex === undefined) return undefined;
+          const hasMeldAction = latestView.availableActions.some(
+            (a) => a.type === "pon" || a.type === "chi" || a.type === "ron" || a.type === "minkan",
+          );
+          return hasMeldAction ? toRelative(latestView.lastDiscardPlayerIndex) : undefined;
+        })()}
         actionButtons={
           isMyTurn ? (
             <ActionButtons

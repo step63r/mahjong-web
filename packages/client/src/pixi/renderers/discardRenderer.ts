@@ -63,20 +63,40 @@ function getSidewaysExtraSize(direction: Direction, tileW: number, faceH: number
   }
 }
 
+// ===== 最後の捨て牌の位置情報 =====
+
+export interface LastDiscardPosition {
+  /** 牌の左上 x 座標 */
+  x: number;
+  /** 牌の左上 y 座標 */
+  y: number;
+  /** 牌の表面幅 */
+  w: number;
+  /** 牌の表面高さ */
+  h: number;
+}
+
 // ===== メイン =====
 
 /**
  * 4方向の捨て牌コンテナを更新する
+ * @returns 最後に捨てられた牌の画面上の位置（lastDiscardPlayerIndex を渡した場合）
  */
 export function updateDiscards(
   discards: [Container, Container, Container, Container],
   layout: BoardLayout,
   players: readonly PlayerViewState[],
-): void {
+  lastDiscardPlayerIndex?: number,
+): LastDiscardPosition | null {
   const dirs: Direction[] = ["self", "shimocha", "toimen", "kamicha"];
+  let lastPos: LastDiscardPosition | null = null;
   for (let i = 0; i < 4; i++) {
-    renderDiscardArea(discards[i], layout, dirs[i], players[i]);
+    const pos = renderDiscardArea(discards[i], layout, dirs[i], players[i]);
+    if (i === lastDiscardPlayerIndex && pos) {
+      lastPos = pos;
+    }
   }
+  return lastPos;
 }
 
 function renderDiscardArea(
@@ -84,9 +104,9 @@ function renderDiscardArea(
   layout: BoardLayout,
   direction: Direction,
   player: PlayerViewState | undefined,
-): void {
+): LastDiscardPosition | null {
   container.removeChildren();
-  if (!player) return;
+  if (!player) return null;
 
   const { tileW, faceH, depthDefault } = layout;
   const dl = layout[direction].discard;
@@ -96,6 +116,8 @@ function renderDiscardArea(
 
   // stride軸の累積オフセット（横倒し牌のサイズ差分を蓄積）
   let cumulativeExtra = { x: 0, y: 0 };
+
+  let lastPos: LastDiscardPosition | null = null;
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
@@ -118,17 +140,20 @@ function renderDiscardArea(
       sprite.alpha = 0.7;
     }
 
-    sprite.x =
+    const sx =
       dl.origin.x +
       dl.stride.x * col +
       dl.rowOffset.x * row +
       cumulativeExtra.x;
 
-    sprite.y =
+    const sy =
       dl.origin.y +
       dl.stride.y * col +
       dl.rowOffset.y * row +
       cumulativeExtra.y;
+
+    sprite.x = sx;
+    sprite.y = sy;
 
     // 負方向 stride の横倒し牌は前の牌に重なるため、自身の位置も補正する
     if (isRiichi) {
@@ -143,5 +168,25 @@ function renderDiscardArea(
       cumulativeExtra.x += extra.dx;
       cumulativeExtra.y += extra.dy;
     }
+
+    // 最後の牌の位置を記録
+    if (i === entries.length - 1) {
+      // リーチ横倒し牌の補正を反映した座標
+      const fx = sprite.x;
+      const fy = sprite.y;
+      // 方向によって牌のサイズが異なる（自家・対面は寝かせてtileW×faceH、下家・上家はfaceH×tileW）
+      let w: number;
+      let h: number;
+      if (direction === "self" || direction === "toimen") {
+        w = isRiichi ? faceH : tileW;
+        h = isRiichi ? tileW : faceH;
+      } else {
+        w = isRiichi ? tileW : faceH;
+        h = isRiichi ? faceH : tileW;
+      }
+      lastPos = { x: fx, y: fy, w, h };
+    }
   }
+
+  return lastPos;
 }
