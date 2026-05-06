@@ -809,6 +809,7 @@ export class GameManager {
     const actionDtos = actions.map((a) => this.serializeAction(a));
     const view = this.buildPlayerView(room, seatIndex);
     view.availableActions = actionDtos;
+    view.isPostMeld = this.isPostMeldDrawPhase(room, seatIndex);
 
     if (player.socketId && player.isConnected) {
       this.io.to(player.socketId).emit("game:stateUpdate", view);

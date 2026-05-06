@@ -175,6 +175,8 @@ export interface PlayerGameView {
   opponents: OpponentPlayerView[];
   /** 利用可能なアクション */
   availableActions: ActionDto[];
+  /** 副露直後の打牌フェーズか（ツモ切り不可の判定用） */
+  isPostMeld?: boolean;
   /** 局結果（completed時のみ） */
   roundResult?: RoundResultDto;
   /** 最終結果（finished時のみ） */

@@ -89,6 +89,7 @@ export function OnlineGamePage() {
     gameResult,
     scores,
     error,
+    isPostMeldTurn,
     setupGameListeners,
     selectTile,
     sendAction,
@@ -195,7 +196,7 @@ export function OnlineGamePage() {
             const action = {
               ...match,
               tile: { type: tile.type, id: tile.id, isRedDora: tile.isRedDora },
-              isTsumogiri: isDrawnTile ? true : match.isTsumogiri,
+              isTsumogiri: isPostMeldTurn ? false : (isDrawnTile ? true : match.isTsumogiri),
             };
             sendAction(action);
             return;

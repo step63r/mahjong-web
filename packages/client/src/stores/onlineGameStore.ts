@@ -51,6 +51,8 @@ export interface OnlineGameStore {
   gameResult: GameResultDto | null;
   /** 得点（局結果表示用） */
   scores: [number, number, number, number];
+  /** 副露直後の打牌フェーズか（ツモ切り判定用） */
+  isPostMeldTurn: boolean;
   /** エラーメッセージ */
   error: string | null;
 
@@ -82,6 +84,7 @@ export const useOnlineGameStore = create<OnlineGameStore>((set, get) => ({
   roundResult: null,
   gameResult: null,
   scores: [0, 0, 0, 0],
+  isPostMeldTurn: false,
   error: null,
 
   setupGameListeners: () => {
@@ -99,6 +102,7 @@ export const useOnlineGameStore = create<OnlineGameStore>((set, get) => ({
         availableActions: view.availableActions,
         actionOptions: hasActions ? buildOnlineActionOptions(view.availableActions) : [],
         uiPhase: hasActions ? "myTurn" : "playing",
+        isPostMeldTurn: view.isPostMeld ?? false,
         selectedTileIndex: undefined,
         roundResult: null,
         error: null,

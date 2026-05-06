@@ -24,6 +24,7 @@ export function GamePage() {
     roundState,
     availableActions,
     selectedTileIndex,
+    isPostMeldTurn,
     debugMode,
     debugSelectedWallTileKey,
     debugSelectedHandTileKey,
@@ -145,7 +146,7 @@ export function GamePage() {
             const action = {
               ...match,
               tile: exactTile,
-              isTsumogiri: isDrawnTile ? true : match.isTsumogiri,
+              isTsumogiri: isPostMeldTurn ? false : (isDrawnTile ? true : match.isTsumogiri),
             };
             performAction(action);
             return;

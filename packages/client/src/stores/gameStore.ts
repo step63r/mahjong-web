@@ -63,6 +63,8 @@ export interface GameStore {
   cpuGameSaved: boolean;
   replayRoundEvents: RoundEventDataDto[];
   currentRoundReplay: RoundEventDataDto | null;
+  /** 副露直後の打牌フェーズか（ツモ切り判定用） */
+  isPostMeldTurn: boolean;
 
   // actions
   startCpuGame: (ruleConfig: RuleConfig) => void;
@@ -431,6 +433,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   cpuGameSaved: false,
   replayRoundEvents: [],
   currentRoundReplay: null,
+  isPostMeldTurn: false,
 
   startCpuGame: (ruleConfig) => {
     // Strict Mode の二重実行によるゲームループ重複を防止
@@ -484,7 +487,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ) {
         appendReplayAction(get, set, roundState, action);
         applyAction(roundState, action);
-        set({ availableActions: [], selectedTileIndex: undefined });
+        set({ availableActions: [], selectedTileIndex: undefined, isPostMeldTurn: false });
       } else if (
         roundState.phase === RoundPhase.AfterDiscard ||
         roundState.phase === RoundPhase.AfterKan
@@ -493,7 +496,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         resolveWithHumanAction(roundState, humanPlayerIndex, action, (resolvedAction) => {
           appendReplayAction(get, set, roundState, resolvedAction);
         });
-        set({ availableActions: [], selectedTileIndex: undefined });
+        // 鸣きアクションの場合は次の打牌フェーズが副露直後となる
+        const isMeld =
+          action.type === ActionType.Chi ||
+          action.type === ActionType.Pon ||
+          action.type === ActionType.Minkan;
+        set({ availableActions: [], selectedTileIndex: undefined, isPostMeldTurn: isMeld });
       }
     }
 
