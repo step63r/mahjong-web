@@ -50,11 +50,14 @@ export function GamePage() {
   }, [uiPhase, startCpuGame]);
 
   // ゲーム終了 → リザルト画面へ遷移
-  useEffect(() => {
-    if (uiPhase === "gameResult") {
+  // useEffect ではなく同期コールバックで navigate することで
+  // gameResult が Zustand にセットされた直後に遷移し、タイミング問題を防ぐ
+  const handleNextRound = useCallback(() => {
+    nextRound();
+    if (useGameStore.getState().uiPhase === "gameResult") {
       navigate("/result");
     }
-  }, [uiPhase, navigate]);
+  }, [nextRound, navigate]);
 
   // === リーチモード ===
   const [riichiMode, setRiichiMode] = useState(false);
@@ -310,7 +313,7 @@ export function GamePage() {
         <RoundResultOverlay
           result={roundState.result}
           scores={gameState.scores}
-          onNext={nextRound}
+          onNext={handleNextRound}
         />
       )}
     </>

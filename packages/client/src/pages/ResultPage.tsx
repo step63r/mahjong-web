@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGameStore } from "@/stores/gameStore";
 
@@ -7,23 +8,20 @@ export function ResultPage() {
   const navigate = useNavigate();
   const { gameResult, returnToTop } = useGameStore();
 
+  // gameResult がない場合はトップへリダイレクト（直接URL入力やリロード対策）
+  useEffect(() => {
+    if (!gameResult) {
+      navigate("/", { replace: true });
+    }
+  }, [gameResult, navigate]);
+
   const handleReturn = () => {
     returnToTop();
     navigate("/");
   };
 
   if (!gameResult) {
-    return (
-      <div className="min-h-screen bg-emerald-900 flex flex-col items-center justify-center gap-8 p-4">
-        <p className="text-white text-xl">結果データがありません</p>
-        <button
-          onClick={handleReturn}
-          className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-xl text-lg transition-colors"
-        >
-          トップに戻る
-        </button>
-      </div>
-    );
+    return null;
   }
 
   // 順位順にソート
