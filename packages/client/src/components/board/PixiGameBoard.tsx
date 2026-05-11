@@ -45,6 +45,8 @@ export interface PixiGameBoardProps {
   actionButtons?: React.ReactNode;
   /** 最後の捨て牌をハイライトする（副露アクション選択中）プレイヤー相対インデックス */
   highlightLastDiscardPlayerIndex?: number;
+  /** 配牌アニメーション中の各プレイヤーの表示枚数 [self, shimocha, toimen, kamicha] */
+  revealedCounts?: readonly [number, number, number, number];
 }
 
 // ===== コンテナ階層の参照 =====
@@ -260,7 +262,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
 
     // リーチモード中は riichiSelectedIndex を選択表示として使用
     const activeSelectedIndex = props.riichiSelectedIndex ?? props.selectedTileIndex;
-    updateHands(containers.hands, layout, props.players, activeSelectedIndex, props.onTileClick, props.riichiCandidateIndices);
+    updateHands(containers.hands, layout, props.players, activeSelectedIndex, props.onTileClick, props.riichiCandidateIndices, props.revealedCounts);
     const lastPos = updateDiscards(containers.discards, layout, props.players, props.highlightLastDiscardPlayerIndex);
     highlightPosRef.current = lastPos;
     // ハイライトがなくなった場合は即座に消す

@@ -77,12 +77,14 @@ export function toMeldView(meld: Meld, playerIndex: number): MeldViewData {
  * humanIndex のプレイヤーは手牌を公開し、それ以外は伏せ牌にする。
  * debugMode が true の場合は全員の手牌を公開する。
  * revealedPlayerIndices が指定された場合、該当プレイヤーの手牌も公開する。
+ * sorted が false の場合、自家の手牌をソートせず挿入順（配牌順）で返す。
  */
 export function buildPlayerViews(
   round: RoundState,
   humanIndex: number,
   debugMode: boolean,
   revealedPlayerIndices?: ReadonlySet<number>,
+  sorted = true,
 ): PlayerViewState[] {
   return round.players.map((player, i) => {
     const showHand = i === humanIndex || debugMode || (revealedPlayerIndices?.has(i) ?? false);
@@ -98,10 +100,10 @@ export function buildPlayerViews(
     if (showHand) {
       if (isFullHand && hasDraw) {
         const drawnTileRaw = handTiles[handTiles.length - 1];
-        hand = sortTiles(handTiles.slice(0, -1)).map(toTileData);
+        hand = (sorted ? sortTiles(handTiles.slice(0, -1)) : [...handTiles.slice(0, -1)]).map(toTileData);
         drawnTile = toTileData(drawnTileRaw);
       } else {
-        hand = sortTiles([...handTiles]).map(toTileData);
+        hand = (sorted ? sortTiles([...handTiles]) : [...handTiles]).map(toTileData);
         drawnTile = undefined;
       }
     } else {

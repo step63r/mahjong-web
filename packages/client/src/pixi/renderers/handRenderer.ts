@@ -39,11 +39,12 @@ export function updateHands(
   selectedTileIndex: number | undefined,
   onTileClick?: (index: number) => void,
   riichiCandidateIndices?: ReadonlySet<number>,
+  revealedCounts?: readonly [number, number, number, number],
 ): void {
-  renderSelfHand(hands[0], layout, players[0], selectedTileIndex, onTileClick, riichiCandidateIndices);
-  renderOpponentHand(hands[1], layout, "shimocha", players[1]);
-  renderOpponentHand(hands[2], layout, "toimen", players[2]);
-  renderOpponentHand(hands[3], layout, "kamicha", players[3]);
+  renderSelfHand(hands[0], layout, players[0], selectedTileIndex, onTileClick, riichiCandidateIndices, revealedCounts?.[0]);
+  renderOpponentHand(hands[1], layout, "shimocha", players[1], revealedCounts?.[1]);
+  renderOpponentHand(hands[2], layout, "toimen", players[2], revealedCounts?.[2]);
+  renderOpponentHand(hands[3], layout, "kamicha", players[3], revealedCounts?.[3]);
 }
 
 // ===== 自家の手牌 =====
@@ -55,17 +56,20 @@ function renderSelfHand(
   selectedTileIndex: number | undefined,
   onTileClick?: (index: number) => void,
   riichiCandidateIndices?: ReadonlySet<number>,
+  revealedCount?: number,
 ): void {
   container.removeChildren();
   if (!player) return;
 
-  const { tileW } = layout;
+  const { tileW, faceH } = layout;
   const { origin, stride, tsumoGap } = layout.self.hand;
   const tiles = player.hand;
   const isRiichiMode = riichiCandidateIndices !== undefined;
 
+  const handShowCount = revealedCount !== undefined ? Math.min(revealedCount, tiles.length) : tiles.length;
+
   // 通常手牌（13枚以下）
-  for (let i = 0; i < tiles.length; i++) {
+  for (let i = 0; i < handShowCount; i++) {
     const tile = tiles[i];
     const sprite = createSelfStandingTile(tile.type, tile.isRedDora, tileW);
     sprite.x = origin.x + stride.x * i;
@@ -95,7 +99,7 @@ function renderSelfHand(
   }
 
   // ツモ牌（14枚目）
-  if (player.drawnTile) {
+  if (player.drawnTile && (revealedCount === undefined || revealedCount > tiles.length)) {
     const dt = player.drawnTile;
     const tsumoIdx = tiles.length;
     const sprite = createSelfStandingTile(dt.type, dt.isRedDora, tileW);
@@ -145,6 +149,7 @@ function renderOpponentHand(
   layout: BoardLayout,
   direction: OpponentDirection,
   player: PlayerViewState | undefined,
+  revealedCount?: number,
 ): void {
   container.removeChildren();
   if (!player) return;
@@ -152,10 +157,11 @@ function renderOpponentHand(
   const { tileW } = layout;
   const { origin, stride } = layout[direction].hand;
   const tileCount = player.hand.length;
+  const showCount = revealedCount !== undefined ? Math.min(revealedCount, tileCount) : tileCount;
   const createBack = STANDING_CREATORS[direction];
   const createFace = FACE_UP_CREATORS[direction];
 
-  for (let i = 0; i < tileCount; i++) {
+  for (let i = 0; i < showCount; i++) {
     const tile = player.hand[i];
     const isFaceUp = tile.type !== "back";
     const sprite = isFaceUp

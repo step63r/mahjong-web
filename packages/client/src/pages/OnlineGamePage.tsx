@@ -7,6 +7,7 @@ import { useOnlineRoomStore } from "@/stores/onlineRoomStore";
 import {
   getOnlineRiichiCandidateTileTypes,
   computeOnlineWaitingTiles,
+  gameViewToPlayerViews,
 } from "@/utils/onlineViewConverter";
 import type { OnlineWaitingTileInfo } from "@/utils/onlineViewConverter";
 import type { RoundResultDto, GameResultDto } from "@mahjong-web/shared";
@@ -14,6 +15,40 @@ import { RoundResultTile } from "@/components/tile/RoundResultTile";
 import { sortTiles } from "@mahjong-web/domain";
 
 const SEAT_NAMES = ["自家", "下家", "対面", "上家"] as const;
+
+// ===== 配牌シーケンスヘルパー =====
+
+function buildDealSequence(
+  dealerViewIdx: number,
+  totalCounts: readonly [number, number, number, number],
+): Array<readonly [number, number, number, number]> {
+  const steps: Array<readonly [number, number, number, number]> = [];
+  const counts: [number, number, number, number] = [0, 0, 0, 0];
+  // 3周 × 4枚ずつ
+  for (let round = 0; round < 3; round++) {
+    for (let i = 0; i < 4; i++) {
+      const vIdx = (dealerViewIdx + i) % 4;
+      counts[vIdx] = Math.min(counts[vIdx] + 4, totalCounts[vIdx]);
+      steps.push([...counts] as [number, number, number, number]);
+    }
+  }
+  // 最終: 東家が 2 枚（1 枚ずつ）、他家が 1 枚ずつ
+  const d = dealerViewIdx;
+  for (let extra = 0; extra < 2; extra++) {
+    if (counts[d] < totalCounts[d]) {
+      counts[d]++;
+      steps.push([...counts] as [number, number, number, number]);
+    }
+  }
+  for (let i = 1; i < 4; i++) {
+    const vIdx = (dealerViewIdx + i) % 4;
+    if (counts[vIdx] < totalCounts[vIdx]) {
+      counts[vIdx]++;
+      steps.push([...counts] as [number, number, number, number]);
+    }
+  }
+  return steps;
+}
 
 const REASON_LABELS: Record<string, string> = {
   win: "和了",
@@ -90,6 +125,7 @@ export function OnlineGamePage() {
     scores,
     error,
     isPostMeldTurn,
+    roundStartKey,
     setupGameListeners,
     selectTile,
     sendAction,
@@ -152,6 +188,27 @@ export function OnlineGamePage() {
     setRiichiMode(false);
     setRiichiSelectedIndex(undefined);
   }, [uiPhase]);
+
+  // 配牌アニメーション
+  const [dealRevealedCounts, setDealRevealedCounts] = useState<readonly [number, number, number, number] | null>(null);
+  useEffect(() => {
+    if (!latestView || playerViews.length === 0) return;
+    const mySeat = latestView.mySeatIndex;
+    const dealerViewIdx = (latestView.dealerIndex - mySeat + 4) % 4;
+    const totalCounts = [0, 1, 2, 3].map(
+      (i) => playerViews[i].hand.length + (playerViews[i].drawnTile ? 1 : 0)
+    ) as [number, number, number, number];
+    const sequence = buildDealSequence(dealerViewIdx, totalCounts);
+    setDealRevealedCounts([0, 0, 0, 0]);
+    const STEP_MS = 150;
+    const ids: ReturnType<typeof setTimeout>[] = [];
+    sequence.forEach((counts, idx) => {
+      ids.push(setTimeout(() => setDealRevealedCounts(counts), STEP_MS * (idx + 1)));
+    });
+    ids.push(setTimeout(() => setDealRevealedCounts(null), STEP_MS * (sequence.length + 1)));
+    return () => { ids.forEach(clearTimeout); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundStartKey]);
 
   const handleTileClick = useCallback(
     (index: number) => {
@@ -265,10 +322,15 @@ export function OnlineGamePage() {
     playerNames[rel] = opp.playerName || "ゲスト";
   }
 
+  // アニメーション中は配牌順（未ソート）ビューを使用
+  const displayPlayerViews = dealRevealedCounts !== null
+    ? gameViewToPlayerViews(latestView, false)
+    : playerViews;
+
   return (
     <>
       <PixiGameBoard
-        players={playerViews}
+        players={displayPlayerViews}
         roundWind={latestView.roundWind}
         roundNumber={latestView.roundNumber}
         honba={latestView.honba}
@@ -284,6 +346,7 @@ export function OnlineGamePage() {
         riichiWaitingTiles={isMyTurn ? riichiWaitingTiles : undefined}
         onTileClick={isMyTurn ? handleTileClick : undefined}
         riichiCandidateIndices={isMyTurn ? riichiCandidateIndices : undefined}
+        revealedCounts={dealRevealedCounts ?? undefined}
         highlightLastDiscardPlayerIndex={(() => {
           if (!isMyTurn || latestView.lastDiscardPlayerIndex === undefined) return undefined;
           const hasMeldAction = latestView.availableActions.some(

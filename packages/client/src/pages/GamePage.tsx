@@ -12,6 +12,45 @@ import type { RuleConfig } from "@mahjong-web/domain";
 import type { TileData } from "@/types";
 import type { WaitingTileInfo } from "@/utils/viewConverter";
 
+// ===== 配牌シーケンスヘルパー =====
+
+/**
+ * 配牌アニメーションの各ステップ終了時における
+ * [self, shimocha, toimen, kamicha] の公開枚数配列を返す。
+ * 検被順: 東家→南家→西家→北家（親 = dealerViewIdx）。
+ */
+function buildDealSequence(
+  dealerViewIdx: number,
+  totalCounts: readonly [number, number, number, number],
+): Array<readonly [number, number, number, number]> {
+  const steps: Array<readonly [number, number, number, number]> = [];
+  const counts: [number, number, number, number] = [0, 0, 0, 0];
+  // 3周 × 4枚ずつ
+  for (let round = 0; round < 3; round++) {
+    for (let i = 0; i < 4; i++) {
+      const vIdx = (dealerViewIdx + i) % 4;
+      counts[vIdx] = Math.min(counts[vIdx] + 4, totalCounts[vIdx]);
+      steps.push([...counts] as [number, number, number, number]);
+    }
+  }
+  // 最終: 東家が 2 枚（1 枚ずつ）、他家が 1 枚ずつ
+  const d = dealerViewIdx;
+  for (let extra = 0; extra < 2; extra++) {
+    if (counts[d] < totalCounts[d]) {
+      counts[d]++;
+      steps.push([...counts] as [number, number, number, number]);
+    }
+  }
+  for (let i = 1; i < 4; i++) {
+    const vIdx = (dealerViewIdx + i) % 4;
+    if (counts[vIdx] < totalCounts[vIdx]) {
+      counts[vIdx]++;
+      steps.push([...counts] as [number, number, number, number]);
+    }
+  }
+  return steps;
+}
+
 export function GamePage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,6 +68,7 @@ export function GamePage() {
     debugSelectedWallTileKey,
     debugSelectedHandTileKey,
     debugTargetPlayer,
+    roundStartKey,
     startCpuGame,
     selectTile,
     performAction,
@@ -38,6 +78,7 @@ export function GamePage() {
     selectDebugHandTile,
     setDebugTargetPlayer,
     performDebugSwap,
+    kickoffGameLoop,
   } = useGameStore();
   const { status: authStatus, profile } = useAuthStore();
 
@@ -97,6 +138,31 @@ export function GamePage() {
     setRiichiMode(false);
     setRiichiSelectedIndex(undefined);
   }, [uiPhase]);
+
+  // 配牌アニメーション
+  const [dealRevealedCounts, setDealRevealedCounts] = useState<readonly [number, number, number, number] | null>(null);
+  useEffect(() => {
+    if (!roundState) return;
+    // totalCounts: 実際の手牌枚数（東家=14、他家=13）
+    const totalCounts = [0, 1, 2, 3].map(
+      (i) => roundState.players[i].hand.getTiles().length
+    ) as [number, number, number, number];
+    const dealerViewIdx = roundState.dealerIndex;
+    const sequence = buildDealSequence(dealerViewIdx, totalCounts);
+    setDealRevealedCounts([0, 0, 0, 0]);
+    const STEP_MS = 150;
+    const ids: ReturnType<typeof setTimeout>[] = [];
+    sequence.forEach((counts, idx) => {
+      ids.push(setTimeout(() => setDealRevealedCounts(counts), STEP_MS * (idx + 1)));
+    });
+    // アニメーション完了: 表示をソート済みに戻し、ゲームループを起動
+    ids.push(setTimeout(() => {
+      setDealRevealedCounts(null);
+      kickoffGameLoop();
+    }, STEP_MS * (sequence.length + 1)));
+    return () => { ids.forEach(clearTimeout); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundStartKey]);
 
   const handleTileClick = useCallback(
     (index: number) => {
@@ -224,7 +290,9 @@ export function GamePage() {
     );
   }
 
-  const playerViews = buildPlayerViews(roundState, 0, debugMode, revealedPlayers);
+  const playerViews = dealRevealedCounts !== null
+    ? buildPlayerViews(roundState, 0, debugMode, revealedPlayers, false)
+    : buildPlayerViews(roundState, 0, debugMode, revealedPlayers);
   const selfPlayerName = authStatus === "authenticated"
     ? (profile?.displayName ?? "ゲスト")
     : "ゲスト";
@@ -236,7 +304,7 @@ export function GamePage() {
     isRedDora: t.isRedDora,
   }));
 
-  const isWaiting = !debugMode && (uiPhase === "waitingHumanDraw" || uiPhase === "waitingHumanAfterDiscard");
+  const isWaiting = !debugMode && !dealRevealedCounts && (uiPhase === "waitingHumanDraw" || uiPhase === "waitingHumanAfterDiscard");
 
   return (
     <>
@@ -257,6 +325,7 @@ export function GamePage() {
         riichiWaitingTiles={isWaiting ? riichiWaitingTiles : undefined}
         onTileClick={isWaiting ? handleTileClick : undefined}
         riichiCandidateIndices={isWaiting ? riichiCandidateIndices : undefined}
+        revealedCounts={dealRevealedCounts ?? undefined}
         highlightLastDiscardPlayerIndex={
           !debugMode && uiPhase === "waitingHumanAfterDiscard"
             ? roundState.lastDiscardPlayerIndex

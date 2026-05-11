@@ -55,6 +55,8 @@ export interface OnlineGameStore {
   isPostMeldTurn: boolean;
   /** エラーメッセージ */
   error: string | null;
+  /** 局開始ごとにインクリメント（配牌アニメーション用） */
+  roundStartKey: number;
 
   // --- アクション ---
   /** Socket リスナーをセットアップ */
@@ -86,11 +88,13 @@ export const useOnlineGameStore = create<OnlineGameStore>((set, get) => ({
   scores: [0, 0, 0, 0],
   isPostMeldTurn: false,
   error: null,
+  roundStartKey: 0,
 
   setupGameListeners: () => {
     const socket = getSocket();
 
     socket.on("game:stateUpdate", (view: PlayerGameView) => {
+      const isNewRound = get().uiPhase === "waiting";
       const playerViews = gameViewToPlayerViews(view);
       const doraIndicators = view.doraIndicators.map(dtoToTileData);
       const hasActions = view.availableActions.length > 0;
@@ -106,6 +110,7 @@ export const useOnlineGameStore = create<OnlineGameStore>((set, get) => ({
         selectedTileIndex: undefined,
         roundResult: null,
         error: null,
+        ...(isNewRound ? { roundStartKey: get().roundStartKey + 1 } : {}),
       });
     });
 
@@ -191,6 +196,7 @@ export const useOnlineGameStore = create<OnlineGameStore>((set, get) => ({
       gameResult: null,
       scores: [0, 0, 0, 0],
       error: null,
+      roundStartKey: 0,
     });
   },
 }));

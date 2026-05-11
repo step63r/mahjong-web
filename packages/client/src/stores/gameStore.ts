@@ -65,6 +65,8 @@ export interface GameStore {
   currentRoundReplay: RoundEventDataDto | null;
   /** 副露直後の打牌フェーズか（ツモ切り判定用） */
   isPostMeldTurn: boolean;
+  /** 局開始のたびにインクリメントされるキー（配牌アニメーショントリガー用） */
+  roundStartKey: number;
 
   // actions
   startCpuGame: (ruleConfig: RuleConfig) => void;
@@ -77,6 +79,8 @@ export interface GameStore {
   selectDebugHandTile: (key: string | undefined) => void;
   setDebugTargetPlayer: (playerIndex: number) => void;
   performDebugSwap: () => void;
+  /** 配牌アニメーション完了後に呼び出す。ゲームループを起動する。 */
+  kickoffGameLoop: () => void;
 }
 
 const AI = new BasicAiPlayer();
@@ -434,6 +438,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   replayRoundEvents: [],
   currentRoundReplay: null,
   isPostMeldTurn: false,
+  roundStartKey: 0,
 
   startCpuGame: (ruleConfig) => {
     // Strict Mode の二重実行によるゲームループ重複を防止
@@ -464,10 +469,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cpuGameSaved: false,
       replayRoundEvents: [],
       currentRoundReplay: createRoundReplayData(game, round),
+      roundStartKey: get().roundStartKey + 1,
     });
 
-    // Kick off the game loop
-    setTimeout(() => get().performAction(null as unknown as PlayerAction), 0);
+    // 配牌アニメーション完了後に GamePage から kickoffGameLoop が呼ばれる
   },
 
   selectTile: (index) => {
@@ -546,9 +551,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       availableActions: [],
       selectedTileIndex: undefined,
       currentRoundReplay: createRoundReplayData(gameState, round),
+      roundStartKey: get().roundStartKey + 1,
     });
-
-    setTimeout(() => get().performAction(null as unknown as PlayerAction), 0);
+    // 配牌アニメーション完了後に GamePage から kickoffGameLoop が呼ばれる
   },
 
   returnToTop: () => {
@@ -627,6 +632,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       debugSelectedHandTileKey: undefined,
       availableActions: newAvailableActions,
     });
+  },
+
+  kickoffGameLoop: () => {
+    setTimeout(() => get().performAction(null as unknown as PlayerAction), 0);
   },
 }));
 
