@@ -95,7 +95,7 @@ export const useOnlineGameStore = create<OnlineGameStore>((set, get) => ({
 
     socket.on("game:stateUpdate", (view: PlayerGameView) => {
       const isNewRound = get().uiPhase === "waiting";
-      const playerViews = gameViewToPlayerViews(view);
+      const playerViews = gameViewToPlayerViews(view, true, view.isPostMeld ?? false);
       const doraIndicators = view.doraIndicators.map(dtoToTileData);
       const hasActions = view.availableActions.length > 0;
 

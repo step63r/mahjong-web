@@ -85,20 +85,23 @@ export function buildPlayerViews(
   debugMode: boolean,
   revealedPlayerIndices?: ReadonlySet<number>,
   sorted = true,
+  isPostMeldTurn = false,
 ): PlayerViewState[] {
   return round.players.map((player, i) => {
     const showHand = i === humanIndex || debugMode || (revealedPlayerIndices?.has(i) ?? false);
     const handTiles = player.hand.getTiles();
 
     // 手牌: ツモ牌は最後の1枚を分離して drawnTile にする（14枚の場合）
+    // isPostMeldTurn=true の場合は副露直後でドロー牌はなく、全牌を hand に含める
     const hasDraw = handTiles.length === 14 - player.melds.length * 3;
+    const effectiveHasDraw = hasDraw && !(i === humanIndex && isPostMeldTurn);
     const isFullHand = handTiles.length % 3 === 2; // 14, 11, 8, 5, 2...
 
     let hand: TileData[];
     let drawnTile: TileData | undefined;
 
     if (showHand) {
-      if (isFullHand && hasDraw) {
+      if (isFullHand && effectiveHasDraw) {
         const drawnTileRaw = handTiles[handTiles.length - 1];
         hand = (sorted ? sortTiles(handTiles.slice(0, -1)) : [...handTiles.slice(0, -1)]).map(toTileData);
         drawnTile = toTileData(drawnTileRaw);

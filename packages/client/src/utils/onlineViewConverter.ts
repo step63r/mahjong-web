@@ -117,14 +117,15 @@ function dtoToMeldView(dto: MeldDto, playerSeatIndex: number): MeldViewData {
 
 // ===== Self → PlayerViewState =====
 
-function selfToViewState(self: SelfPlayerView, sorted = true): PlayerViewState {
+function selfToViewState(self: SelfPlayerView, sorted = true, isPostMeld = false): PlayerViewState {
   const tiles = self.handTiles.map(dtoToTileData);
+  // isPostMeld=true の場合は副露直後でドロー牌はなく、全牌を hand に含める
   const hasDraw = tiles.length % 3 === 2; // 14, 11, 8, 5, 2...
 
   let hand: TileData[];
   let drawnTile: TileData | undefined;
 
-  if (hasDraw) {
+  if (!isPostMeld && hasDraw) {
     drawnTile = tiles[tiles.length - 1];
     hand = sorted
       ? sortTiles(tiles.slice(0, -1) as unknown as Tile[]).map(dtoToTileData)
@@ -169,12 +170,12 @@ function opponentToViewState(opp: OpponentPlayerView): PlayerViewState {
  * PlayerGameView を GameBoard 用の PlayerViewState[4] に変換する。
  * 配列順: [0]=self, [1]=下家, [2]=対面, [3]=上家
  */
-export function gameViewToPlayerViews(view: PlayerGameView, sorted = true): PlayerViewState[] {
+export function gameViewToPlayerViews(view: PlayerGameView, sorted = true, isPostMeld = false): PlayerViewState[] {
   const mySeat = view.mySeatIndex;
   const result: PlayerViewState[] = new Array(4);
 
   // 自分
-  result[0] = selfToViewState(view.self, sorted);
+  result[0] = selfToViewState(view.self, sorted, isPostMeld);
 
   // 他家を相対位置で配置
   for (const opp of view.opponents) {

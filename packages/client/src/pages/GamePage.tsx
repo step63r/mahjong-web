@@ -125,13 +125,13 @@ export function GamePage() {
   const activeWaitingIndex = riichiMode ? riichiSelectedIndex : selectedTileIndex;
   const riichiWaitingTiles: WaitingTileInfo[] | undefined = useMemo(() => {
     if (activeWaitingIndex === undefined || !roundState) return undefined;
-    const views = buildPlayerViews(roundState, 0, debugMode);
+    const views = buildPlayerViews(roundState, 0, debugMode, undefined, true, isPostMeldTurn);
     const selfView = views[0];
     const tile =
       activeWaitingIndex === selfView.hand.length ? selfView.drawnTile : selfView.hand[activeWaitingIndex];
     if (!tile) return undefined;
     return computeWaitingTiles(roundState, tile.type);
-  }, [activeWaitingIndex, roundState, debugMode]);
+  }, [activeWaitingIndex, roundState, debugMode, isPostMeldTurn]);
 
   // フェーズが変わったらリーチモードを解除
   useEffect(() => {
@@ -172,7 +172,7 @@ export function GamePage() {
       if (riichiMode && roundState) {
         if (riichiSelectedIndex === index) {
           // 確定: リーチアクション実行
-          const views = buildPlayerViews(roundState, 0, debugMode);
+          const views = buildPlayerViews(roundState, 0, debugMode, undefined, true, isPostMeldTurn);
           const selfView = views[0];
           const sortedTile =
             index === selfView.hand.length ? selfView.drawnTile : selfView.hand[index];
@@ -197,7 +197,7 @@ export function GamePage() {
         // ダブルクリックで打牌
         const discardActions = availableActions.filter((a) => a.type === ActionType.Discard);
         // ソート済みUI手牌からindex番目の牌のtypeを取得して打牌
-        const views = buildPlayerViews(roundState!, 0, debugMode);
+        const views = buildPlayerViews(roundState!, 0, debugMode, undefined, true, isPostMeldTurn);
         const selfView = views[0];
         const sortedTile =
           index === selfView.hand.length ? selfView.drawnTile : selfView.hand[index];
@@ -233,6 +233,7 @@ export function GamePage() {
       availableActions,
       roundState,
       debugMode,
+      isPostMeldTurn,
       performAction,
       selectTile,
     ],
@@ -292,7 +293,7 @@ export function GamePage() {
 
   const playerViews = dealRevealedCounts !== null
     ? buildPlayerViews(roundState, 0, debugMode, revealedPlayers, false)
-    : buildPlayerViews(roundState, 0, debugMode, revealedPlayers);
+    : buildPlayerViews(roundState, 0, debugMode, revealedPlayers, true, isPostMeldTurn);
   const selfPlayerName = authStatus === "authenticated"
     ? (profile?.displayName ?? "ゲスト")
     : "ゲスト";
