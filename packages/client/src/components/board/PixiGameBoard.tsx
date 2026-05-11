@@ -60,25 +60,29 @@ export interface BoardContainers {
   infoPanel: Container;
 }
 
-// ===== フック: 画面高さに連動する盤面サイズ =====
+// ===== フック: 画面サイズに連動する盤面サイズ =====
 
-function useBoardSize(): number {
-  const [size, setSize] = useState(() => window.innerHeight);
+function useBoardDimensions(): { width: number; height: number } {
+  const [dims, setDims] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
 
   useEffect(() => {
-    const onResize = () => setSize(window.innerHeight);
+    const onResize = () => setDims({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  return size;
+  return dims;
 }
 
 // ===== フック: Pixi Application 管理 =====
 
 function usePixiApp(
   containerRef: RefObject<HTMLDivElement | null>,
-  boardSize: number,
+  boardWidth: number,
+  boardHeight: number,
 ): { app: Application | null; ready: boolean } {
   const appRef = useRef<Application | null>(null);
   const [ready, setReady] = useState(false);
@@ -89,8 +93,8 @@ function usePixiApp(
 
     app
       .init({
-        width: boardSize,
-        height: boardSize,
+        width: boardWidth,
+        height: boardHeight,
         backgroundColor: 0x1a1a2e,
         antialias: true,
         resolution: window.devicePixelRatio || 1,
@@ -143,7 +147,6 @@ function useBoardContainers(
   app: Application | null,
   ready: boolean,
   layout: BoardLayout,
-  boardSize: number,
 ): BoardContainers | null {
   const [containers, setContainers] = useState<BoardContainers | null>(null);
 
@@ -156,7 +159,7 @@ function useBoardContainers(
     // --- 背景: キャンバス全体を濃緑で塗る ---
     const bg = new Graphics();
     bg.fill(TABLE_COLOR);
-    bg.rect(0, 0, boardSize, boardSize);
+    bg.rect(0, 0, layout.boardWidth, layout.boardHeight);
     bg.fill();
     app.stage.addChild(bg);
 
@@ -195,10 +198,10 @@ function useBoardContainers(
 
 export function PixiGameBoard(props: PixiGameBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const boardSize = useBoardSize();
-  const { app, ready } = usePixiApp(containerRef, boardSize);
-  const layout = useMemo(() => calculateBoardLayout(boardSize), [boardSize]);
-  const containers = useBoardContainers(app, ready, layout, boardSize);
+  const { width: boardWidth, height: boardHeight } = useBoardDimensions();
+  const { app, ready } = usePixiApp(containerRef, boardWidth, boardHeight);
+  const layout = useMemo(() => calculateBoardLayout(boardWidth, boardHeight), [boardWidth, boardHeight]);
+  const containers = useBoardContainers(app, ready, layout);
 
   // --- ハイライト用 Graphics ---
   const highlightGraphicsRef = useRef<Graphics | null>(null);
@@ -248,8 +251,8 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
   }, [app, ready]);
   useEffect(() => {
     if (!app || !ready) return;
-    app.renderer.resize(boardSize, boardSize);
-  }, [app, ready, boardSize]);
+    app.renderer.resize(boardWidth, boardHeight);
+  }, [app, ready, boardWidth, boardHeight]);
 
   // --- 描画更新 ---
   useEffect(() => {
@@ -285,7 +288,7 @@ export function PixiGameBoard(props: PixiGameBoardProps) {
     <div className="flex flex-col h-screen bg-[#1a1a2e] select-none overflow-hidden">
       {/* Pixi canvas + HTML オーバーレイ */}
       <div className="flex-1 flex items-center justify-center">
-        <div style={{ position: "relative", width: boardSize, height: boardSize }}>
+        <div style={{ position: "relative", width: boardWidth, height: boardHeight }}>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
           {ready && (
             <PixiInfoPanel

@@ -46,6 +46,10 @@ export interface DirectionLayout {
 }
 
 export interface BoardLayout {
+  /** 盤面幅 (px) */
+  boardWidth: number;
+  /** 盤面高さ (px) */
+  boardHeight: number;
   /** 牌の表面幅 (px) */
   tileW: number;
   /** 牌の表面高さ = tileW × 4/3 */
@@ -71,26 +75,32 @@ const PADDING = 4;
 
 /**
  * 盤面サイズから全レイアウト情報を算出する
+ *
+ * @param boardWidth  盤面幅 (px)。省略時は 720。
+ * @param boardHeight 盤面高さ (px)。省略時は boardWidth と同値（正方形）。
  */
-export function calculateBoardLayout(boardSize = 720): BoardLayout {
+export function calculateBoardLayout(boardWidth = 720, boardHeight = boardWidth): BoardLayout {
   // --- tileW 導出 (2D フラット) ---
-  // (boardSize - 6*tileW) / 2 ≥ 4*lyingH + standH + PADDING
+  // 短辺を基準にして両方向に要素が収まるよう tileW を計算する。
+  // (shortSide - 6*tileW) / 2 ≥ 4*lyingH + standH + PADDING
   // lyingH = tileW（厚みなし）
   // standH = TILE_ASPECT_RATIO * tileW = faceH
   const lyingCoeff = 4; // 4行分 × tileW
   const handCoeff = TILE_ASPECT_RATIO;
   const totalCoeff = 10;
-  const tileW = Math.floor((boardSize / 2 - PADDING) / totalCoeff);
+  const shortSide = Math.min(boardWidth, boardHeight);
+  const tileW = Math.floor((shortSide / 2 - PADDING) / totalCoeff);
 
   const faceH = tileW * TILE_ASPECT_RATIO;
   const depthSelf = 0;
   const depthDefault = 0;
 
-  // --- 情報パネル ---
+  // --- 情報パネル（盤面中央に配置） ---
   const ipSide = 6 * tileW;
-  const ipXY = (boardSize - ipSide) / 2;
-  const ipRight = ipXY + ipSide;
-  const ipBottom = ipXY + ipSide;
+  const ipX = (boardWidth - ipSide) / 2;
+  const ipY = (boardHeight - ipSide) / 2;
+  const ipRight = ipX + ipSide;
+  const ipBottom = ipY + ipSide;
 
   // --- 共通サイズ (2D: 厚みなし) ---
   const lyingW = faceH; // 自家/対面 倒牌の横幅
@@ -101,15 +111,15 @@ export function calculateBoardLayout(boardSize = 720): BoardLayout {
   const discardRowW = DISCARD_TILES_PER_ROW * lyingW;
   const selfDiscardRowW = DISCARD_TILES_PER_ROW * tileW; // 自家は正位置（tileW幅）
   const discardRowH = DISCARD_TILES_PER_ROW * faceH; // 縦方向（下家/上家）
-  const centerX = boardSize / 2;
-  const centerY = boardSize / 2;
+  const centerX = boardWidth / 2;
+  const centerY = boardHeight / 2;
 
   // ================= 自家 (bottom) =================
   const selfStandH = faceH + depthSelf;
 
   const selfLayout: DirectionLayout = {
     hand: {
-      origin: { x: (boardSize - HAND_TILES * tileW) / 2, y: boardSize - selfStandH },
+      origin: { x: (boardWidth - HAND_TILES * tileW) / 2, y: boardHeight - selfStandH },
       stride: { x: tileW, y: 0 },
       tsumoGap: { x: TSUMO_GAP, y: 0 },
     },
@@ -119,35 +129,40 @@ export function calculateBoardLayout(boardSize = 720): BoardLayout {
       rowOffset: { x: 0, y: faceH },
     },
     meld: {
-      origin: { x: boardSize, y: boardSize - faceH },
+      origin: { x: boardWidth, y: boardHeight - faceH },
       tileStride: { x: -tileW, y: 0 },
     },
   };
 
   // ================= 下家 (right) =================
   const shimochaLayout = calculateShimochaLayout(
-    boardSize, tileW, faceH, depthDefault,
+    boardWidth, tileW, faceH, depthDefault,
     ipRight, centerY, discardRowH, sideLyingW,
   );
 
   // ================= 対面 (top) =================
   const toimenLayout = calculateToimenLayout(
-    boardSize, tileW, faceH, depthDefault,
-    ipXY, centerX, discardRowW, lyingW, lyingH,
+    tileW, faceH, depthDefault,
+    ipY, centerX, discardRowW, lyingW, lyingH,
   );
 
   // ================= 上家 (left) =================
   const kamichaLayout = calculateKamichaLayout(
-    boardSize, tileW, faceH, depthDefault,
-    ipXY, centerY, discardRowH, sideLyingW,
+    boardHeight, tileW, faceH, depthDefault,
+    ipX, centerY, discardRowH, sideLyingW,
   );
 
+  // lyingCoeff / handCoeff は totalCoeff の根拠を示すドキュメント用変数
+  void lyingCoeff; void handCoeff;
+
   return {
+    boardWidth,
+    boardHeight,
     tileW,
     faceH,
     depthSelf,
     depthDefault,
-    infoPanel: { x: ipXY, y: ipXY, size: ipSide },
+    infoPanel: { x: ipX, y: ipY, size: ipSide },
     self: selfLayout,
     shimocha: shimochaLayout,
     toimen: toimenLayout,
@@ -161,7 +176,7 @@ export function calculateBoardLayout(boardSize = 720): BoardLayout {
  * 下家 (right): 手牌は右端を縦に下→上、捨て牌は情報パネル右辺から右へ下→上
  */
 function calculateShimochaLayout(
-  boardSize: number, tileW: number, faceH: number, _depthDefault: number,
+  boardWidth: number, tileW: number, faceH: number, _depthDefault: number,
   ipRight: number, centerY: number, _discardRowH: number, sideLyingW: number,
 ): DirectionLayout {
   const shimochaDiscardRowH = DISCARD_TILES_PER_ROW * tileW;
@@ -171,7 +186,7 @@ function calculateShimochaLayout(
   // 捨て牌: 正位置左90°→ faceH × tileW。strideは縦方向 -tileW
   return {
     hand: {
-      origin: { x: boardSize - faceH, y: handOriginY },
+      origin: { x: boardWidth - faceH, y: handOriginY },
       stride: { x: 0, y: -tileW },
       tsumoGap: { x: 0, y: -TSUMO_GAP },
     },
@@ -182,22 +197,24 @@ function calculateShimochaLayout(
     },
     meld: {
       // 上端から下へ（下家の右=画面上）
-      origin: { x: boardSize - faceH, y: 0 },
+      origin: { x: boardWidth - faceH, y: 0 },
       tileStride: { x: 0, y: faceH },
     },
   };
+  void sideLyingW;
 }
 
 /**
  * 対面 (top): 自家の180度回転。手牌は上端を右→左、捨て牌は情報パネル上辺から上へ右→左
  */
 function calculateToimenLayout(
-  boardSize: number, tileW: number, faceH: number, depthDefault: number,
-  ipXY: number, centerX: number, _discardRowW: number, lyingW: number, _lyingH: number,
+  tileW: number, faceH: number, depthDefault: number,
+  ipY: number, centerX: number, _discardRowW: number, lyingW: number, _lyingH: number,
 ): DirectionLayout {
   const toimenDiscardRowW = DISCARD_TILES_PER_ROW * tileW;
   // 手牌: 上端に横並び（右から左へ）。立牌 = tileW × (faceH + depthDefault)
   const handOriginX = centerX + (HAND_TILES * tileW) / 2 - tileW;
+  void depthDefault;
   return {
     hand: {
       origin: { x: handOriginX, y: 0 },
@@ -206,7 +223,7 @@ function calculateToimenLayout(
     },
     discard: {
       // 牌0 = 行0最右部。行は情報パネル上辺から上へ、牌は右→左
-      origin: { x: centerX + toimenDiscardRowW / 2 - tileW, y: ipXY - faceH },
+      origin: { x: centerX + toimenDiscardRowW / 2 - tileW, y: ipY - faceH },
       stride: { x: -tileW, y: 0 },
       rowOffset: { x: 0, y: -faceH },
     },
@@ -222,8 +239,8 @@ function calculateToimenLayout(
  * 上家 (left): 下家の左右反転。手牌は左端を縦に上→下、捨て牌は情報パネル左辺から左へ上→下
  */
 function calculateKamichaLayout(
-  boardSize: number, tileW: number, faceH: number, _depthDefault: number,
-  ipXY: number, centerY: number, _discardRowH: number, sideLyingW: number,
+  boardHeight: number, tileW: number, faceH: number, _depthDefault: number,
+  ipX: number, centerY: number, _discardRowH: number, sideLyingW: number,
 ): DirectionLayout {
   const kamichaDiscardRowH = DISCARD_TILES_PER_ROW * tileW;
   // 手牌: 左端に縦並び（上から下へ）。立牌サイズ = faceH × faceW
@@ -237,14 +254,15 @@ function calculateKamichaLayout(
     },
     discard: {
       // 牌0 = 行0最上部。行は情報パネル左辺から左へ、牌は上→下
-      origin: { x: ipXY - faceH, y: centerY - kamichaDiscardRowH / 2 },
+      origin: { x: ipX - faceH, y: centerY - kamichaDiscardRowH / 2 },
       stride: { x: 0, y: tileW },
       rowOffset: { x: -faceH, y: 0 },
     },
     meld: {
       // 下端から上へ（上家の右=画面下）
-      origin: { x: 0, y: boardSize },
+      origin: { x: 0, y: boardHeight },
       tileStride: { x: 0, y: -faceH },
     },
   };
+  void sideLyingW;
 }
